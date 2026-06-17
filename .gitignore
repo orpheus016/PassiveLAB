@@ -217,5 +217,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Converters
-converter/
+# Converter
+converter/raw/
+converter/output/
