@@ -1,0 +1,36 @@
+# Auto PR review with Claude. Structure mirrors the verified examples/claude.yml.
+# When activating, reconcile the `prompt` and inputs against the upstream example
+# anthropics/claude-code-action examples/claude-code-review.yml in case they change.
+# Requires the Claude GitHub App + CLAUDE_CODE_OAUTH_TOKEN secret (see docs/github-automation-setup.md).
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Claude review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review this pull request for correctness, clarity, and adherence to the
+            invariants in docs/ARCHITECTURE.md (stable core APIs; no notebook logic in
+            core; no module bypasses another; PDK-agnostic). Leave concise inline review
+            comments and a short summary. Do not approve or merge.
+          # claude_args: |
+          #   --max-turns 12
