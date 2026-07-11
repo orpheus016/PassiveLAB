@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "passivelab"
+version = "0.0.0"
+description = "A platform to automate passive structure generation, validation, optimization, exploration, and inverse design."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.optional-dependencies]
+# Runtime deps (gdstk/openEMS/torch/optuna/ngspice bindings) are added per sub-phase,
+# as the PRD's interfaces land. Keep `dev` minimal so CI stays fast.
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
