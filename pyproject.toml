@@ -9,16 +9,24 @@ description = "A platform to automate passive structure generation, validation, 
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
-dependencies = []
+# gdstk lands here in sub-phase 1.1.2 (the L3 Generator backend, per the gdstk-vs-gdspy
+# matrix in docs/GENERATOR_COMPARISON_MATRIX.md). Further runtime deps (openEMS/torch/
+# optuna/ngspice bindings) are added per sub-phase, as the PRD's interfaces land.
+dependencies = ["gdstk>=0.9"]
 
 [project.optional-dependencies]
-# Runtime deps (gdstk/openEMS/torch/optuna/ngspice bindings) are added per sub-phase,
-# as the PRD's interfaces land. Keep `dev` minimal so CI stays fast.
+# Keep `dev` minimal so CI stays fast.
 dev = ["pytest>=8"]
+# Benchmark-ecosystem tooling (algorithm/backend comparisons) — not part of the fast CI gate,
+# run on demand: pytest benchmark/ --benchmark-only. See benchmark/geometry/tcoil/README.md.
+bench = ["pytest-benchmark>=4", "matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+# "tests" = whole-package tests (see tests/GOAL.md); "src" picks up each device's own
+# geometry/<device>/tests/ folder (see src/passivelab/geometry/GOAL.md). `benchmark/` is
+# deliberately excluded -- run on demand via `pytest benchmark/ --benchmark-only`.
+testpaths = ["tests", "src"]
 addopts = "-q"
