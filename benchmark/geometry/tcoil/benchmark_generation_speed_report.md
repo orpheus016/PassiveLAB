@@ -27,8 +27,11 @@ to an explicit field here so it's genuinely one of the 11, not baked in.
 
 | Case | Min (µs) | Mean (µs) | Max (µs) | StdDev (µs) | Rounds |
 |---|---|---|---|---|---|
-| `nseg=24` (wid=5, gap=8) | 287.6 | 337.7 | 1045.0 | 75.2 | 2478 |
-| `nseg=10` (wid=7, gap=12, the notebook's own vector) | 347.7 | 378.5 | 875.1 | 43.7 | 1231 |
+| `nseg=24` (wid=5, gap=8) | 290.9 | 339.8 | 782.4 | 76.1 | 2557 |
+| `nseg=10` (wid=7, gap=12, the notebook's own vector) | 348.6 | 375.4 | 695.9 | 27.3 | 1616 |
+
+(Re-measured after the endratio-segment fix below — one extra polygon per generation,
+negligible effect on timing.)
 
 Sub-millisecond generation for a single T-coil either way. The notebook's Stage 3 batches
 thousands of samples (`TOOLS_AND_ARTIFACTS.md` Stage 3 row) — at ~0.3–0.4 ms/sample, 5,000
@@ -57,8 +60,8 @@ found hard to install, and is a second, independent maintainability signal beyon
 
 | Case | Polygons | File size |
 |---|---|---|
-| `nseg=10` (notebook vector) | 311 | 20,656 bytes |
-| `nseg=24` | 207 | 14,400 bytes |
+| `nseg=10` (notebook vector) | 312 | 20,736 bytes |
+| `nseg=24` | 208 | 14,480 bytes |
 
 Note: polygon/file-size count does **not** scale monotonically with `nseg` alone — it depends
 more on via-array density (`wid`/`gap` ratio) than turn count, since `_combine_layer` merges
@@ -68,23 +71,44 @@ batch generation run.
 
 ## 6. Visual verification
 
-Two previews rendered with `preview.py` (matplotlib, no KLayout GUI) and visually inspected
-before committing:
+**Two real bugs found and fixed after review** (caught by comparing a KLayout render of the
+committed `.gds` against the golden notebook's own reference diagram, and by inspecting the
+octagon preview closely):
 
-- `previews/tcoil_rect.png` — the notebook's own `nseg=10` vector: octagon pad, ground-plane
-  cutout, one mostly-coincident outer double-layer ring (see note below) — matches expectations
-  for that specific parameter choice.
-- A second render at `nseg=20` (not committed, used only to sanity-check the spiral logic)
-  clearly showed a proper multi-ring stepped-in rectangular spiral, confirming the winding
-  logic is correct — at `nseg=10`, `id_turn` only reaches `0`/`1` (it increments every *two*
-  full 4-segment turns), so the two metal layers route the *same* outer loop before the spiral
-  starts stepping inward. This is a real T-coil design characteristic (both thick-metal layers
-  used on the outer ring, matching `docs/PRD/Phase 1 — TCoil Platformization.md` §5's "top-two
-  thick metals for the coil"), not a porting bug — confirmed by tracing the exact coordinates
-  by hand against the ported code.
-- `previews/tcoil_octagon.png` — the bonus octagonal-spiral variant (exploratory, not from the
-  notebook — see `octagon_variant.py`): a clean symmetric multi-ring octagonal spiral with a
-  central pad, demonstrating gdstk handles non-rectilinear geometry equally well.
+- **Missing endratio-controlled segment.** The notebook's own documentation diagram
+  ("Seg9 (Blue)", length = `[endratio] * maxlen_Seg9`, `Tap_segid=4` — exactly this report's
+  test vector) shows the *last* coil segment (`tid == nseg-1`) should draw a visible trace
+  before its perpendicular `Lext` lead-out. Re-checking the ported source
+  (`reference/markdown/TCoil_Dataset_Generator_and_Training.md`, the `if tid == nseg - 1:`
+  branch) confirmed it computes that segment's path (`tmp_list`) to derive the lead-out
+  coordinates but never draws it — unlike the non-last-segment branch just below, which does.
+  Ported faithfully from the source at first; the notebook's own diagram confirms it's a real
+  completeness gap, not a stylistic omission. **Fixed**: added the missing
+  `shape_list.append(gdstk.FlexPath(tmp_list, wid, layer=thick_metals[cur_metal], ...))` in all
+  4 directional cases of that branch (`generator.py`). Verified directly: for the baseline
+  vector the new polygon is the brown segment at x∈[134.5,141.5], y∈[8.5,63.5] — it now bridges
+  what was previously a floating, disconnected orange lead-out bar. Polygon count 311 → 312
+  (exactly one new shape, as expected — only one of the 4 cases fires per generation).
+- **Octagon ring corners not connected** (bonus/exploratory `octagon_variant.py` only — the
+  validated rectangular T-coil was unaffected). The original implementation stroked a
+  `gdstk.FlexPath` around the octagon vertices; FlexPath's mitering didn't close cleanly at the
+  45°/135° corners, leaving gaps. Looked at
+  [dgrujic/pcLab](https://github.com/dgrujic/pcLab)'s `pclab/pclGeom.py::octSegment()` (on
+  request) — it confirms the right general approach: octagon rings must be built as **explicit
+  closed polygons**, never stroked paths; pcLab hand-derives one 8-point polygon per quadrant
+  (with extra ground-contact/bridge details this demo doesn't need). **Fixed** with a simpler
+  version of the same idea: each ring is now `gdstk.boolean(outer_octagon, inner_octagon,
+  "not", ...)` — the same annulus-via-boolean-difference technique already used successfully in
+  `templates.create_ground_plane` — structurally gapless since it's a polygon operation, not a
+  stroke.
+
+Both previews re-rendered and re-inspected after the fixes: `previews/tcoil_rect.png` (the
+notebook's own `nseg=10` vector — octagon pad, ground-plane cutout, the now-connected
+double-layer outer ring — at `nseg=10`, `id_turn` only reaches `0`/`1` since it increments every
+*two* full 4-segment turns, so both thick-metal layers legitimately route the same outer loop
+before the spiral steps inward, matching "top-two thick metals for the coil" in the PRD, not a
+bug) and `previews/tcoil_octagon.png` (now a clean, fully-connected multi-ring octagonal
+spiral with a central pad).
 
 ## 7. Determinism
 
@@ -122,4 +146,7 @@ Full port: `src/passivelab/geometry/tcoil/{generator.py,templates.py}`, ~230 lin
 gdstk reproduces the golden notebook's T-coil faithfully (same coordinates, same parameters,
 valid GDS, sub-millisecond generation), needs no gdspy-style workaround, and the one thing that
 made a live gdspy comparison impossible here — its Windows build requirement — is itself
-further evidence against gdspy, on top of 1.1.1's archived-repo finding.
+further evidence against gdspy, on top of 1.1.1's archived-repo finding. One completeness bug
+was caught in review (§6, the missing endratio segment) and fixed before this report was
+finalized — worth noting for 1.1.3 as a reminder that a mechanical port still needs the same
+"compare against the reference diagram, not just the source" scrutiny gdspy code itself would.

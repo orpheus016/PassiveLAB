@@ -119,6 +119,7 @@ def generate_tcoil(params: TCoilParams, *, thick_metals=None, gnd_metal=M5_METAL
                     termix = sizX - id_turn * gap
                     tmp_list = [(startx, org_id_turn * gap + wid / 2), (startx, id_turn * gap),
                                 (startx + (termix - startx) * endratio + wid / 2, id_turn * gap)]
+                    shape_list.append(gdstk.FlexPath(tmp_list, wid, layer=thick_metals[cur_metal], datatype=0))
                     lstx, lsty = tmp_list[-1]
                     lstx -= wid / 2
                     shape_list.append(gdstk.FlexPath([(lstx, lsty + wid / 2), (lstx, -Lext)], wid,
@@ -128,6 +129,7 @@ def generate_tcoil(params: TCoilParams, *, thick_metals=None, gnd_metal=M5_METAL
                     startx, termix = id_turn * gap, sizY - id_turn * gap
                     tmp_list = [(sizX - id_turn * gap, -wid / 2 + startx),
                                 (sizX - id_turn * gap, wid / 2 + startx + (termix - startx) * endratio)]
+                    shape_list.append(gdstk.FlexPath(tmp_list, wid, layer=thick_metals[cur_metal], datatype=0))
                     lstx, lsty = tmp_list[-1]
                     lsty -= wid / 2
                     shape_list.append(gdstk.FlexPath([(lstx - wid / 2, lsty), (sizX + Lext, lsty)], wid,
@@ -137,6 +139,7 @@ def generate_tcoil(params: TCoilParams, *, thick_metals=None, gnd_metal=M5_METAL
                     startx, termix = sizX - id_turn * gap, id_turn * gap
                     tmp_list = [(-wid / 2 + startx, sizY - id_turn * gap),
                                 (wid / 2 + startx + (termix - startx) * endratio, sizY - id_turn * gap)]
+                    shape_list.append(gdstk.FlexPath(tmp_list, wid, layer=thick_metals[cur_metal], datatype=0))
                     lstx, lsty = tmp_list[-1]
                     lstx += wid / 2
                     shape_list.append(gdstk.FlexPath([(lstx, lsty - wid / 2), (lstx, sizY + Lext)], wid,
@@ -147,6 +150,7 @@ def generate_tcoil(params: TCoilParams, *, thick_metals=None, gnd_metal=M5_METAL
                     termix = id_turn * 2 * gap + (gap if cur_metal == 1 else 2 * gap)
                     tmp_list = [(id_turn * gap, wid / 2 + startx),
                                 (id_turn * gap, -wid / 2 + startx - (startx - termix) * endratio)]
+                    shape_list.append(gdstk.FlexPath(tmp_list, wid, layer=thick_metals[cur_metal], datatype=0))
                     lstx, lsty = tmp_list[-1]
                     lsty += wid / 2
                     shape_list.append(gdstk.FlexPath([(lstx + wid / 2, lsty), (-Lext, lsty)], wid,
