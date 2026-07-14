@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import gdstk
 
-from passivelab.geometry.tcoil.generator import TCoilParams
+from passivelab.geometry.tcoil.spec import TCoilParams
 from passivelab.geometry.tcoil.templates import THICK_METAL_LIST, create_octagon_pad, create_octagon_points
 
 
