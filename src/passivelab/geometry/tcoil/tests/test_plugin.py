@@ -12,9 +12,9 @@ import gdstk
 import pytest
 
 from passivelab.core import LayoutGenerator, PassiveSpec
-from passivelab.geometry.tcoil.generator import TCoilParams, generate_tcoil
+from passivelab.geometry.tcoil.generator import generate_tcoil
 from passivelab.geometry.tcoil.plugin import TCoilLayoutGenerator
-from passivelab.geometry.tcoil.spec import TCoilSpec
+from passivelab.geometry.tcoil.spec import TCoilParams, TCoilSpec
 
 # Same fingerprint helper as tcoil/tests/test_generator.py (see there for rationale): polygon
 # count, bounding box, and every polygon's rounded vertex coordinates.

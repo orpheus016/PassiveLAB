@@ -16,7 +16,10 @@ silently "fixed" per the citation rule (contradictions must be noted, not auto-r
 """
 from __future__ import annotations
 
-from passivelab.geometry.tcoil.generator import TCoilParams
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # type-only: spec.py imports this module's validate() at runtime, so a
+    from passivelab.geometry.tcoil.spec import TCoilParams  # real import here would cycle back
 
 SIZE_RANGE = (20, 200)       # sizX, sizY (um)
 WID_RANGE = (3, 12)          # coil segment width (um)

@@ -36,9 +36,10 @@ The two Protocols + their shape tests. No generation logic.
 ## Done
 
 - **The tcoil retrofit** (sub-phase 1.2.3) — `src/passivelab/geometry/tcoil/{spec.py,plugin.py}`
-  wrap the working gdstk generator from 1.1.2 behind `PassiveSpec`/`LayoutGenerator`, with zero
-  edits to `generator.py`/`rules.py`/`templates.py`. Same-geometry regression:
-  `tcoil/tests/test_plugin.py`.
+  wrap the working gdstk generator from 1.1.2 behind `PassiveSpec`/`LayoutGenerator`. `TCoilParams`
+  lives in `spec.py` (moved from `generator.py` for a cleaner, params-free generator module);
+  generation/validation *logic* in `generator.py`/`rules.py` is unchanged (verified by a
+  same-geometry regression, `tcoil/tests/test_plugin.py`).
 - **`spec.json` entry + `openPCells` adoption** — a formal spec file/CLI (designer input) and
   whether to adopt openPCells' spec-driven PCell generation are studied in
   `docs/adoption/OPENPCELLS_ADOPTION_STUDY.md` and tracked as board tasks; not built here.

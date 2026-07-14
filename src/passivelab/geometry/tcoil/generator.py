@@ -3,11 +3,14 @@
 flow are unchanged from the notebook; only the shape-construction API calls are translated to
 gdstk (see docs/GENERATOR_COMPARISON_MATRIX.md for the API map and porting notes).
 
+Pure generation logic only — `TCoilParams` (the params dataclass) lives in `spec.py`, per the
+per-device folder pattern in `geometry/GOAL.md`.
+
 Source: reference/markdown/TCoil_Dataset_Generator_and_Training.md, lines 204-524.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import gdstk
 
@@ -23,26 +26,8 @@ from passivelab.geometry.tcoil.templates import (
     create_via_array,
 )
 
-
-@dataclass
-class TCoilParams:
-    """The T-coil's 11 named parameters (docs/PRD/Phase 1 -- TCoil Platformization.md sub-phase
-    1.3 / the golden notebook's parameter table). `pad_siz` was hardcoded to 50 inside the
-    notebook's `CreateTCoilTraceVanilla`; it's promoted to an explicit field here so all 11
-    parameters named in the PRD table are genuinely wired, not 10."""
-
-    wid: float
-    gap: float
-    sizX: float
-    sizY: float
-    firY: float
-    tapseg: int
-    nseg: int
-    tapratio: float
-    endratio: float
-    Lext: float = 20
-    pad_siz: float = 50
-    includepad: bool = False
+if TYPE_CHECKING:  # type-only: spec.py imports rules.py, which type-hints against TCoilParams
+    from passivelab.geometry.tcoil.spec import TCoilParams  # too -- avoid a runtime import cycle
 
 
 def _combine_layer(cell: gdstk.Cell, target_layer: int) -> None:

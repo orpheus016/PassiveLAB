@@ -4,20 +4,32 @@ Each passive device type gets its own folder here:
 
 ```
 geometry/<device>/
-  generator.py    # the params dataclass + the orchestrating generate_<device>(params) function
-  templates.py     # reusable geometry primitives specific to this device (via arrays, pads,
-                    # ground planes, ...) — the building blocks generator.py assembles
-  rules.py          # parameter validation (PRD-specified range checks on the spec's numbers,
-                     # NOT design-rule/DRC checking against a PDK deck — that's a separate,
-                     # layout-level concern, deferred; see the PassiveLAB board's DRC task);
-                     # validate(params) raises on out-of-spec values
-  spec.py            # the PassiveSpec-conforming wrap (dataclass inheritance from the device's
-                     # own params — see tcoil/spec.py for the pattern); adds `passive_type` +
-                     # `validate()` (delegates to rules.validate, unmodified)
-  plugin.py           # the LayoutGenerator-conforming wrap; calls the device's own
-                     # generate_<device>() unmodified, wraps the result in a core.types.Layout
-  tests/             # functional/correctness tests for this device, co-located
+  spec.py            # ALL of this device's parameters: the params dataclass (e.g. TCoilParams)
+                     # plus the PassiveSpec-conforming wrap (dataclass inheritance) that adds
+                     # `passive_type` + `validate()` (delegates to rules.validate, unmodified).
+                     # Keeping params here — not in generator.py — is what keeps generator.py
+                     # pure generation logic (see tcoil/spec.py for the pattern).
+  generator.py        # ONLY the orchestrating generate_<device>(params) function — pure
+                     # generation logic, no data definitions. Type-hints against the params
+                     # dataclass via a TYPE_CHECKING-guarded import from spec.py (avoids a
+                     # runtime import cycle: spec.py needs rules.py at runtime for validate()).
+  templates.py         # reusable geometry primitives specific to this device (via arrays, pads,
+                       # ground planes, ...) — the building blocks generator.py assembles
+  rules.py              # parameter validation (PRD-specified range checks on the spec's numbers,
+                        # NOT design-rule/DRC checking against a PDK deck — that's a separate,
+                        # layout-level concern, deferred; see the PassiveLAB board's DRC task);
+                        # validate(params) raises on out-of-spec values. Type-hints against the
+                        # params dataclass the same TYPE_CHECKING way as generator.py, for the
+                        # same reason.
+  plugin.py              # the LayoutGenerator-conforming wrap; calls the device's own
+                        # generate_<device>() unmodified, wraps the result in a core.types.Layout
+  tests/                 # functional/correctness tests for this device, co-located
 ```
+
+Dependency direction within a device folder: `generator.py` → `spec.py` → `rules.py` (one-way).
+`spec.py` needs `rules.validate` as a *real* runtime import (to implement `TCoilSpec.validate()`);
+`generator.py` and `rules.py` only need the params dataclass for a type hint, so those go under
+`if TYPE_CHECKING:` — real imports there would create a cycle (`spec → rules → spec`).
 
 Each device is independent — MOMCap's `rules.py` has nothing to do with T-coil's, and neither
 should need to touch the other's `templates.py`. That's the point: parallel development across
@@ -35,7 +47,9 @@ from a single example risks getting it wrong (Phase 1 PRD §3: "do not generaliz
 the approved `LayoutGenerator`/`PassiveSpec` interfaces, not throwaway code.
 
 **tcoil is done** (sub-phase 1.2.3): `tcoil/spec.py` + `tcoil/plugin.py` are the wrap, verified by
-a same-geometry regression against the unmodified `generate_tcoil()` (`tcoil/tests/test_plugin.py`)
-and driven end-to-end through `passivelab.core` in `tests/test_tcoil_core_integration.py`. Zero
-edits to `generator.py`/`rules.py`/`templates.py` — this is the pattern the next device (MOMCap,
-Phase 2) repeats.
+a same-geometry regression against `generate_tcoil()` (`tcoil/tests/test_plugin.py`) and driven
+end-to-end through `passivelab.core` in `tests/test_tcoil_core_integration.py`. `TCoilParams` was
+later relocated from `generator.py` into `spec.py` (this folder-shape doc's own recommendation) —
+`generator.py`/`rules.py` only changed by an import line each (real → `TYPE_CHECKING`-guarded); no
+generation or validation *logic* changed, re-confirmed by the same regression test staying green.
+This is the pattern the next device (MOMCap, Phase 2) repeats from the start.
