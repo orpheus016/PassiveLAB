@@ -1,4 +1,7 @@
-"""T-coil geometry generator (gdstk backend, see docs/GENERATOR_COMPARISON_MATRIX.md)."""
+"""T-coil geometry generator (gdstk backend, see docs/GENERATOR_COMPARISON_MATRIX.md) and its
+PassiveSpec/LayoutGenerator plugin wrap (sub-phase 1.2.3, see docs/CORE_INTERFACE_DESIGN.md)."""
 from passivelab.geometry.tcoil.generator import TCoilParams, generate_tcoil
+from passivelab.geometry.tcoil.plugin import TCoilLayoutGenerator
+from passivelab.geometry.tcoil.spec import TCoilSpec
 
-__all__ = ["TCoilParams", "generate_tcoil"]
+__all__ = ["TCoilParams", "generate_tcoil", "TCoilSpec", "TCoilLayoutGenerator"]

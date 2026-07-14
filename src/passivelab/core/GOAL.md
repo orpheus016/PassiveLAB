@@ -61,8 +61,9 @@ references (`core/tests/`). No logic, no backends, no dispatch.
   needs a plugin registry, which needs a *second* caller to design against. Built in **1.3**
   (T-Coil plugin), when tcoil registers as the first real entry. Until then, callers inject the
   concrete implementation explicitly (as the archetype tests do).
-- **Concrete backends** — real generators (1.2.3 wraps tcoil), solvers (1.4), dataset/ANN
-  (1.5/1.6), optimizers (1.7), end-to-end (1.8).
+- **Concrete backends** — real generators (**1.2.3 done**: tcoil wrapped, see
+  `geometry/tcoil/{spec.py,plugin.py}`), solvers (1.4), dataset/ANN (1.5/1.6), optimizers (1.7),
+  end-to-end (1.8).
 - **External-tool adoption** — mlflow (tracking) and openPCells (spec/PCell) are studied in
   `docs/adoption/` and tracked as board tasks/ADRs, **not** adopted here.
 
