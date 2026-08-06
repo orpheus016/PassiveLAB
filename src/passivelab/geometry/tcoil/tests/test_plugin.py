@@ -1,8 +1,8 @@
 """Tests for the T-coil PassiveSpec/LayoutGenerator plugin wrap (sub-phase 1.2.3).
 
-The load-bearing check is the same-geometry regression: the plugin path must produce byte-for-byte
-the same fingerprint as calling ``generate_tcoil()`` directly — proving this is a wrap, not a
-rewrite (zero edits to generator.py/rules.py/templates.py).
+The load-bearing check is the same-geometry regression: the plugin path must produce the same
+fingerprint as calling ``generate_tcoil()`` directly and then ``split_ports()``-ing the result --
+proving the plugin only adds the 1.3.2 port-separation step, no other geometry divergence.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import gdstk
 import pytest
 
 from passivelab.core import LayoutGenerator, PassiveSpec
-from passivelab.geometry.tcoil.generator import generate_tcoil
+from passivelab.geometry.tcoil.generator import generate_tcoil, split_ports
 from passivelab.geometry.tcoil.plugin import TCoilLayoutGenerator
 from passivelab.geometry.tcoil.spec import TCoilParams, TCoilSpec
 
@@ -62,15 +62,17 @@ def test_validate_raises_on_invalid_spec_same_as_rules():
 def test_generate_returns_layout_with_manifest_and_metadata():
     layout = TCoilLayoutGenerator().generate(BASELINE_SPEC)
     assert isinstance(layout.cell, gdstk.Cell)
-    assert layout.metadata == {"passive_type": "tcoil"}
+    assert layout.metadata["passive_type"] == "tcoil"
+    assert isinstance(layout.metadata["ports_cell"], gdstk.Cell)  # 1.3.2: openEMS port markers
     assert layout.parameter_manifest["wid"] == 7
     assert layout.parameter_manifest["nseg"] == 10
 
 
-def test_plugin_path_produces_identical_geometry_to_direct_call():
-    """The load-bearing regression: TCoilLayoutGenerator().generate(spec).cell must fingerprint
-    identically to calling generate_tcoil() directly with the same parameters -- proving the wrap
-    changes nothing about the generated geometry."""
-    via_plugin = TCoilLayoutGenerator().generate(BASELINE_SPEC).cell
-    via_direct = generate_tcoil(BASELINE_PARAMS)
-    assert _summary(via_plugin) == _summary(via_direct)
+def test_plugin_path_produces_identical_geometry_to_direct_call_plus_split():
+    """The load-bearing regression, updated for 1.3.2: the plugin path's Layout.cell/ports_cell
+    must fingerprint identically to calling generate_tcoil() directly and then split_ports()-ing
+    the result -- proving the plugin wrap only adds the port-separation step, nothing else."""
+    via_plugin = TCoilLayoutGenerator().generate(BASELINE_SPEC)
+    direct_cell, direct_ports = split_ports(generate_tcoil(BASELINE_PARAMS))
+    assert _summary(via_plugin.cell) == _summary(direct_cell)
+    assert _summary(via_plugin.metadata["ports_cell"]) == _summary(direct_ports)
