@@ -18,8 +18,10 @@ import dataclasses
 import gdstk
 import pytest
 
+import passivelab.core as core
 from passivelab.core import LayoutGenerator, Layout, PassiveSpec
-from passivelab.geometry.tcoil import TCoilLayoutGenerator, TCoilSpec
+from passivelab.core.geometry.registry import register
+from passivelab.geometry.tcoil import TCoilLayoutGenerator, TCoilSpec  # noqa: F401 (self-registers "tcoil")
 
 TCOIL_BASELINE = dict(wid=7, gap=12, sizX=150, sizY=120, firY=10, tapseg=4, nseg=10,
                       tapratio=0.5, endratio=0.5, Lext=30, pad_siz=50, includepad=True)
@@ -51,6 +53,13 @@ class _DummyMomCapGenerator:
                      parameter_manifest=dataclasses.asdict(spec))
 
 
+# Self-register into the SAME core registry "tcoil" registers into on import above -- this is
+# the "registry is not a one-device special case" proof (sub-phase 1.3.1): a second, independent
+# PassiveSpec/LayoutGenerator pair dispatches through the identical passivelab.core.generate(spec)
+# free function, with no isinstance/type-branching anywhere in the calling code.
+register("momcap_stub", _DummyMomCapGenerator())
+
+
 def generate_and_count_polygons(spec: PassiveSpec, generator: LayoutGenerator) -> int:
     """The generic caller: no knowledge of which device it's driving, no type-branching."""
     spec.validate()
@@ -79,3 +88,14 @@ def test_both_devices_conform_structurally_with_no_shared_base_class():
 def test_dummy_momcap_validate_raises_like_a_real_spec_would():
     with pytest.raises(ValueError):
         _DummyMomCapSpec(finger_count=0).validate()
+
+
+def test_core_generate_dispatches_tcoil_and_dummy_momcap_through_the_same_registry():
+    """The 1.3.1 validation criterion: core.generate(spec) resolves T-coil and the dummy MoM Cap
+    stub to their own generators purely from spec.passive_type, via the shared plugin registry --
+    with no isinstance/type-branching in this calling code, proving the registry generalizes."""
+    tcoil_layout = core.generate(TCoilSpec(**TCOIL_BASELINE))
+    momcap_layout = core.generate(_DummyMomCapSpec(finger_count=6))
+
+    assert len(tcoil_layout.cell.get_polygons()) > 0
+    assert len(momcap_layout.cell.get_polygons()) == 6

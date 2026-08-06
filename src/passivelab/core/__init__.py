@@ -14,6 +14,9 @@ from passivelab.core.characterization.backend import SimulationBackend
 from passivelab.core.characterization.dataset import DatasetPipeline
 from passivelab.core.characterization.surrogate import Model, ModelTrainer
 from passivelab.core.geometry.generator import LayoutGenerator
+from passivelab.core.geometry.registry import generate
+from passivelab.core.geometry.registry import get as get_generator
+from passivelab.core.geometry.registry import register as register_generator
 from passivelab.core.geometry.spec import PassiveSpec
 from passivelab.core.optimization.optimizer import Optimizer
 from passivelab.core.types import (
@@ -44,4 +47,8 @@ __all__ = [
     "Model",
     "Optimizer",
     "ValidationRunner",
+    # generate(spec) plugin registry (sub-phase 1.3.1)
+    "generate",
+    "get_generator",
+    "register_generator",
 ]

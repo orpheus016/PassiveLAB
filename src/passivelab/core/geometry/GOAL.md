@@ -30,11 +30,18 @@ The two Protocols + their shape tests. No generation logic.
 
 ## Deferred (not here)
 
-- **The plugin registry** — how `generate(spec)` finds `TCoilGenerator` without `core/` importing
-  `tcoil/` — is **1.3**, once there is a real plugin to register.
+(nothing currently deferred at this sub-package level — see `../GOAL.md` for the other three
+core APIs' own dispatch, still to come in 1.4-1.7)
 
 ## Done
 
+- **The plugin registry** (sub-phase 1.3.1) — `registry.py`: `register`/`get`/`generate`, keyed by
+  `PassiveSpec.passive_type`. `generate(spec)` resolves `TCoilLayoutGenerator` (or any other
+  registered device) at runtime with zero `core/` -> `tcoil/`/`gdstk` coupling (re-confirmed by
+  `core/tests/test_no_leakage.py`); the T-coil plugin self-registers on import
+  (`geometry/tcoil/__init__.py`). Also exported at the top level as `passivelab.core.generate`.
+  Multi-device dispatch (not a one-device special case) is proven by
+  `tests/test_plugin_interop.py::test_core_generate_dispatches_tcoil_and_dummy_momcap_through_the_same_registry`.
 - **The tcoil retrofit** (sub-phase 1.2.3) — `src/passivelab/geometry/tcoil/{spec.py,plugin.py}`
   wrap the working gdstk generator from 1.1.2 behind `PassiveSpec`/`LayoutGenerator`. `TCoilParams`
   lives in `spec.py` (moved from `generator.py` for a cleaner, params-free generator module);
