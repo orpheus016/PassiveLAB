@@ -34,6 +34,7 @@ def test_cli_generates_identical_gds_to_the_direct_call(tmp_path):
 
 
 def test_cli_writes_a_nonempty_png_by_default(tmp_path):
+    pytest.importorskip("matplotlib")  # `viz`/`bench` extra, not in the fast-gate `dev` install
     gds_path = generate_command(EXAMPLE_SPEC, tmp_path, png=True)
     png_path = gds_path.with_suffix(".png")
     assert png_path.exists() and png_path.stat().st_size > 0
