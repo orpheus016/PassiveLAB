@@ -57,15 +57,21 @@ references (`core/tests/`). No logic, no backends, no dispatch.
 
 ## Deferred (do not build here / not yet)
 
-- **The four named free-functions with dispatch** (`generate(spec)` that finds the right plugin) —
-  needs a plugin registry, which needs a *second* caller to design against. Built in **1.3**
-  (T-Coil plugin), when tcoil registers as the first real entry. Until then, callers inject the
-  concrete implementation explicitly (as the archetype tests do).
+- **`characterize(objective)`/`optimize(objective)`/`evaluate(candidate)` free-functions with
+  dispatch** — `generate(spec)`'s registry/dispatch pattern (`core/geometry/registry.py`, done in
+  1.3.1) is the template; the other three APIs get their own registries once each has a real
+  backend to register (1.4/1.7/1.7-1.8). Until then, callers inject the concrete implementation
+  explicitly (as the archetype tests do).
 - **Concrete backends** — real generators (**1.2.3 done**: tcoil wrapped, see
   `geometry/tcoil/{spec.py,plugin.py}`), solvers (1.4), dataset/ANN (1.5/1.6), optimizers (1.7),
   end-to-end (1.8).
 - **External-tool adoption** — mlflow (tracking) and openPCells (spec/PCell) are studied in
   `docs/adoption/` and tracked as board tasks/ADRs, **not** adopted here.
+
+## Done
+
+- **`generate(spec)` free-function dispatch** (sub-phase 1.3.1) — `passivelab.core.generate`,
+  backed by the registry in `core/geometry/registry.py`. See `core/geometry/GOAL.md` §Done.
 
 ## See also
 - `docs/CORE_INTERFACE_DESIGN.md` — the approved design of record (vault: `DEC-1-2-1-…` /
