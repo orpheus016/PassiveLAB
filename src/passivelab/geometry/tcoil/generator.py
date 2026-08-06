@@ -31,15 +31,52 @@ if TYPE_CHECKING:  # type-only: spec.py imports rules.py, which type-hints again
 
 
 def _combine_layer(cell: gdstk.Cell, target_layer: int) -> None:
-    """Merge all polygons on `target_layer` into their union. gdstk equivalent of the
-    notebook's CombineLayer (which used gdspy's predicate-based remove_polygons; gdstk's
-    Cell.remove takes objects directly, so we fetch-then-remove-then-re-add instead)."""
-    polys = cell.get_polygons(layer=target_layer, datatype=0)
-    if not polys:
+    """Merge all polygons on `target_layer` into their union, replacing the pre-merge originals.
+    gdstk equivalent of the notebook's CombineLayer (which used gdspy's predicate-based
+    remove_polygons).
+
+    1.3.2 fix: `cell.get_polygons()` returns *copies* ("Return a copy of all polygons in the
+    cell", its own docstring), so the previous `cell.remove(*cell.get_polygons(...))` was a
+    silent no-op -- the true originals never left the cell, and the freshly unioned polygon was
+    added on top of them. Reproduced against the baseline T-coil: layer 126 (Thick Metal 2)
+    carried 7 polygons totaling 7903 area units where the true union is 2 polygons totaling
+    3878 -- every combined layer was silently doubled. Filtering the cell's *real* children
+    (`cell.polygons`/`cell.paths`) gives `cell.remove()` actual targets instead.
+    """
+    originals = [p for p in cell.polygons if p.layer == target_layer and p.datatype == 0]
+    originals += [p for p in cell.paths
+                  if p.layers == (target_layer,) and p.datatypes == (0,)]
+    if not originals:
         return
-    cell.remove(*polys)
-    merged = gdstk.boolean(polys, [], "or", layer=target_layer, datatype=0)
+    merged = gdstk.boolean(originals, [], "or", layer=target_layer, datatype=0)
+    cell.remove(*originals)
     cell.add(*merged)
+
+
+def split_ports(cell: gdstk.Cell, *, port_start: int = PORT_START, port_count: int = 4,
+                 ports_cell_name: str | None = None) -> tuple[gdstk.Cell, gdstk.Cell]:
+    """Separate the openEMS-only port-marker shapes (layers `port_start..port_start+port_count-1`)
+    out of `cell` into their own cell, leaving only PDK-legal geometry behind (1.3.2).
+
+    The port markers are simulation scaffolding inherited verbatim from the golden notebook
+    (`port_start = 200`, `reference/python/TCoil_Dataset_Generator_and_Training.py:222`) -- real
+    generated content, needed by a future openEMS `SimulationBackend` (1.4), but on layer numbers
+    foreign to any real SG13G2 GDS layer (unlike `THICK_METAL_LIST`/`V_THICK`/`M5_METAL`/
+    `M4_METAL`/`V_BELOW`, which are cited PDK numbers). They only became a problem once the
+    platform started handing this cell out as a general-purpose `Layout` for tools like KLayout
+    to open directly. Filters the cell's real children the same way `_combine_layer` does, so
+    `cell.remove()` has actual targets (see that function's docstring for why `get_polygons()`
+    copies don't work for this).
+    """
+    port_layers = range(port_start, port_start + port_count)
+    ports = [p for p in cell.polygons if p.layer in port_layers]
+    ports += [p for p in cell.paths if any(layer in port_layers for layer in p.layers)]
+    if ports:
+        cell.remove(*ports)
+    ports_cell = gdstk.Cell(ports_cell_name or f"{cell.name}_ports")
+    if ports:
+        ports_cell.add(*ports)
+    return cell, ports_cell
 
 
 def generate_tcoil(params: TCoilParams, *, thick_metals=None, gnd_metal=M5_METAL,

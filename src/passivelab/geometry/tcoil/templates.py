@@ -9,6 +9,12 @@ import math
 import gdstk
 
 # IHP SG13G2 layer/datatype numbers, copied from the notebook.
+#
+# DEFAULT_PIN_DT: declared but never used to tag a shape -- in the notebook too
+# (reference/python/TCoil_Dataset_Generator_and_Training.py:215, `default_pin_dt = 2`, never
+# referenced again). Every shape in both codebases is emitted at datatype=0. Left unused rather
+# than guessed-and-wired (1.3.2): there is no SG13G2 layer-purpose table in this repo to cite a
+# real pin/label datatype from, and the citation rule forbids inventing PDK numbers.
 DEFAULT_PIN_DT = 2
 THICK_METAL_LIST = [126, 134]  # [Thick Metal 1, Thick Metal 2]
 V_THICK = 133  # Via Thick Metal, viasize=0.9um, viaspace=1.06um, enclosure=0.5um
@@ -16,6 +22,12 @@ M5_METAL = 67
 M4_METAL = 50
 V_BELOW = 125  # Via Below Metal, viasize=0.42um, viaspace=0.42um, enclosure=0.42/0.1um
 ALL_LAYERS = THICK_METAL_LIST + [V_THICK, M5_METAL, V_BELOW, M4_METAL]
+
+# PORT_START/PORT_LENGTH: openEMS-only port-marker scaffolding, also copied verbatim from the
+# notebook (reference/python/TCoil_Dataset_Generator_and_Training.py:222, `port_start = 200`) --
+# unlike the six numbers above, 200-203 are NOT real SG13G2 layers; the notebook only ever fed
+# them to its own simulator_openems.py, never to a PDK tool. 1.3.2: generator.split_ports()
+# keeps these out of the PDK-facing cell (see its docstring).
 PORT_START = 200
 PORT_LENGTH = 4
 
