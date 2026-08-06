@@ -51,6 +51,8 @@ The four stable core APIs — `generate(spec)`, `characterize(layout)`,
   validation criteria · documentation.
 - Cite sources for physical/characterization claims; record disagreements, never
   auto-resolve them.
+- Finishing a **parent task** (e.g. `1.3` — not each of its `1.3.1`/`1.3.2`/... subtasks) updates
+  root `README.md`: the user-facing surface that changed, not a changelog entry.
 
 ## Workflow (per phase)
 
