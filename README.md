@@ -38,6 +38,25 @@ kit (`gdstk`), enforced by `core/tests/test_no_leakage.py`. See `src/passivelab/
 
 Full docs: `docs/ARCHITECTURE.md`, `docs/VISION.md`, `docs/PRD/`.
 
+## Repository layout
+
+```
+src/passivelab/       # the platform: core/ (stable interfaces) + geometry/<device>/ (plugins)
+tests/                 # cross-cutting integration tests (multi-plugin interop, smoke)
+docs/                  # architecture, vision, roadmap, design + adoption studies
+docs/PRD/              # Master PRD + per-phase requirements
+reference/             # the golden notebook + its markdown/python exports (read-only source of truth)
+benchmark/             # standalone exploratory scripts, outside the core-interface pipeline
+.github/workflows/     # CI (pytest) + claude-code-action automation
+```
+
+## User Guide (planned)
+
+As Phase 1's core APIs land, this section will walk through the repo's end-to-end usage flows:
+going from a stated design objective to an optimized layout, sweeping parameters into a
+characterization dataset, and benchmarking a custom algorithm against the platform. Not written
+yet — the underlying APIs it documents are still being built (see Status below).
+
 ## Status (Phase 1)
 
 - **1.0–1.2 done**: notebook reverse-engineered, gdstk backend chosen, core interfaces + T-coil
