@@ -30,5 +30,9 @@ pytest benchmark/ --benchmark-only          # timing only
 pytest benchmark/geometry/tcoil/benchmark_generation_speed.py -v -s   # + GDS size prints
 ```
 
-`preview.py` is a small matplotlib-based GDS renderer (no KLayout GUI needed) used to generate
-the PNGs in `previews/` for visual sanity-checking generator output.
+GDS preview rendering (`render_png`) moved to `src/passivelab/geometry/preview.py` in 1.3.3 (the
+CLI's default PNG output needs it too, and production code can't import from `benchmark/`) — the
+PNGs in `previews/` were generated with it before the move.
+
+See `../README.md` for the cross-device validity+timing suite (`benchmark/geometry/tests/`),
+which now also exercises these cases via `benchmark.geometry.tcoil.cases`.
