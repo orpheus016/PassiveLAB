@@ -16,8 +16,11 @@ from passivelab.core.characterization.surrogate import Model, ModelTrainer
 from passivelab.core.geometry.generator import LayoutGenerator
 from passivelab.core.geometry.registry import generate
 from passivelab.core.geometry.registry import get as get_generator
+from passivelab.core.geometry.registry import get_spec
 from passivelab.core.geometry.registry import register as register_generator
+from passivelab.core.geometry.registry import register_spec
 from passivelab.core.geometry.spec import PassiveSpec
+from passivelab.core.geometry.spec_loader import load_spec, spec_from_dict
 from passivelab.core.optimization.optimizer import Optimizer
 from passivelab.core.types import (
     Candidate,
@@ -51,4 +54,9 @@ __all__ = [
     "generate",
     "get_generator",
     "register_generator",
+    # spec.json loader (sub-phase 1.3.3)
+    "register_spec",
+    "get_spec",
+    "load_spec",
+    "spec_from_dict",
 ]

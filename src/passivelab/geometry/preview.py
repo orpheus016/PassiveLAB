@@ -2,10 +2,16 @@
 GUI needed" viewer. Neither gdstk nor the `klayout` PyPI package (UI-stripped) ship inline
 rendering; this is the practical alternative (same pattern photonics tooling like gdsfactory
 uses for Jupyter/IDE previews).
+
+Device-agnostic (operates on any gdstk.Cell) -- lives here, not per-device, per the
+geometry/GOAL.md folder pattern. Moved from benchmark/geometry/tcoil/preview.py in 1.3.3: the CLI
+(a production entry point) needs it for its default PNG output, and production code can't import
+from benchmark/ (dev-only tooling, not part of the installed package).
+
+Needs matplotlib (``pip install -e ".[viz]"`` or ``.[bench]"``, which already pulls it in).
 """
 from __future__ import annotations
 
-import itertools
 import pathlib
 
 import gdstk
