@@ -84,14 +84,3 @@ platform path, and writes `benchmark/geometry/tcoil/sweep_out/report.json` plus 
 distinct case for a quick look. `src/passivelab/geometry/tcoil/rules.py`'s docstring records what
 that sweep found about where this repo's current parameter rules and the notebook's own usage
 disagree.
-
-## Status (Phase 1)
-
-- **1.0–1.2 done**: notebook reverse-engineered, gdstk backend chosen, core interfaces + T-coil
-  plugin built and validated against the golden generator.
-- **1.3 T-Coil plugin — done**: plugin registry + `generate(spec)` dispatch (1.3.1), layer/datatype
-  legality (1.3.2), `spec.json` loader/CLI (1.3.3), a notebook-validated parameter sweep (1.3.4),
-  this walkthrough (1.3.5).
-- **1.4+**: simulation, dataset, ANN, optimization pipelines — not started.
-
-Plan/board lives in the sibling `../Second Brain` vault; see `CLAUDE.md`.
