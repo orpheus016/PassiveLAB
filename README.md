@@ -7,64 +7,91 @@ Design Platform for Passive Structures in IC — OpenROAD for passives. Turns a 
 (`reference/jupyter/`) through reusable APIs, so the notebook becomes a thin demonstration
 frontend that only calls those APIs. See `docs/PRD/Phase 1 — TCoil Platformization.md`.
 
-## Install & test
+## Quickstart
 
 ```bash
-pip install -e ".[dev]"
-pytest
+pip install -e ".[dev,viz]"
+python -m passivelab.cli generate examples/tcoil.spec.json
+# -> out/tcoil/tcoil.gds + out/tcoil/tcoil.png
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same suite on every push/PR.
+Open the `.gds` in KLayout, or just look at the `.png`. State your own device by copying
+`examples/tcoil.spec.json` and editing the numbers — see "Generating a layout" below.
 
-## Architecture
-
-Four stable core APIs, each backed by a `typing.Protocol` interface so plugins conform
-structurally (no inheritance required):
-
+```bash
+pytest                                                 # fast gate
+pytest benchmark/geometry/tcoil/test_sweep.py -v -s    # parameter sweep, see "Sweeping" below
 ```
-generate(spec)       -> Layout      (L1-L3   geometry)
-characterize(layout) -> Metrics     (L4-L7   characterization)
-optimize(objective)  -> Candidate   (L8      optimization)
-evaluate(candidate)  -> Score        (L9-L10  benchmark)
-```
-
-A device (e.g. T-coil) is a **plugin**, not core code: it provides a `PassiveSpec`-conforming
-spec and a `LayoutGenerator`-conforming generator, and self-registers into a plugin registry
-keyed by `passive_type` when its package is imported (`src/passivelab/geometry/<device>/`). The
-core `generate(spec)` dispatcher (`passivelab.core.generate`) resolves the right generator at
-runtime purely from `spec.passive_type` — `core/` never imports a device package or a geometry
-kit (`gdstk`), enforced by `core/tests/test_no_leakage.py`. See `src/passivelab/core/GOAL.md` and
-`src/passivelab/geometry/GOAL.md` for the full contract.
-
-Full docs: `docs/ARCHITECTURE.md`, `docs/VISION.md`, `docs/PRD/`.
 
 ## Repository layout
 
 ```
-src/passivelab/       # the platform: core/ (stable interfaces) + geometry/<device>/ (plugins)
-tests/                 # cross-cutting integration tests (multi-plugin interop, smoke)
-docs/                  # architecture, vision, roadmap, design + adoption studies
-docs/PRD/              # Master PRD + per-phase requirements
-reference/             # the golden notebook + its markdown/python exports (read-only source of truth)
-benchmark/             # standalone exploratory scripts, outside the core-interface pipeline
-.github/workflows/     # CI (pytest) + claude-code-action automation
+src/passivelab/
+  core/                # the stable platform contract (Protocols + registries), PDK/device-agnostic
+  core/geometry/        # generate(spec) -> Layout: PassiveSpec, LayoutGenerator, registry, spec.json loader
+  geometry/<device>/     # plugins -- e.g. geometry/tcoil/ (spec, generator, rules, plugin, preview)
+  cli.py                # spec.json -> generate(spec) -> GDS (+ PNG) entry point
+examples/               # spec.json starting points
+tests/                   # cross-cutting integration tests (archetype journeys, multi-plugin interop)
+docs/                    # architecture, vision, roadmap, design + adoption studies, PRD/
+reference/               # the golden notebook + its markdown/python exports (read-only source of truth)
+benchmark/               # on-demand tooling, excluded from the fast gate:
+  geometry/registry.py     # benchmark-case registry, keyed by passive_type
+  geometry/<device>/        # per-device timing benchmarks + cases.py + (T-coil) sweep.py
+  geometry/tests/            # cross-device validity + timing, one JSON report
+.github/workflows/       # CI (pytest) + claude-code-action automation
 ```
 
-## User Guide (planned)
+A device (T-coil, and later others) is a **plugin**, not core code: it provides a
+`PassiveSpec`-conforming spec and a `LayoutGenerator`-conforming generator, and self-registers into
+`core/geometry/registry.py` (keyed by `passive_type`) when its package is imported — `core/` never
+imports a device or a geometry kit (`gdstk`), enforced by `core/tests/test_no_leakage.py`. The four
+stable core APIs:
 
-As Phase 1's core APIs land, this section will walk through the repo's end-to-end usage flows:
-going from a stated design objective to an optimized layout, sweeping parameters into a
-characterization dataset, and benchmarking a custom algorithm against the platform. Not written
-yet — the underlying APIs it documents are still being built (see Status below).
+```
+generate(spec)       -> Layout      (L1-L3   geometry -- built)
+characterize(layout) -> Metrics     (L4-L7   characterization -- 1.4+)
+optimize(objective)  -> Candidate   (L8      optimization -- 1.7+)
+evaluate(candidate)  -> Score        (L9-L10  benchmark -- 1.7+)
+```
+
+Full docs: `docs/ARCHITECTURE.md`, `docs/VISION.md`, `docs/PRD/`, one `GOAL.md` per `src/` folder.
+
+## Generating a layout
+
+`spec.json` is flat: `passive_type` plus that device's own field names verbatim (see
+`examples/tcoil.spec.json`) — no wrapper, no translation. The CLI:
+
+```bash
+python -m passivelab.cli generate my_spec.json --out-dir out --no-png
+```
+
+loads the spec, calls `spec.validate()` (parameter-range checks only — DRC is separate,
+out of scope), dispatches to the right plugin via `generate(spec)`, and writes
+`<out-dir>/<cell_name>/<cell_name>.gds` (+ `.png` unless `--no-png`). The written GDS's layers are
+checked against the plugin's real PDK layer set before it ever reaches you — a malformed spec or
+an unknown `passive_type` fails with one line (`error: ...`), not a traceback.
+
+## Sweeping parameters
+
+```bash
+pytest benchmark/geometry/tcoil/test_sweep.py -v -s
+```
+
+Runs 200 parameter combinations sampled the same way the golden notebook itself samples them (not
+an arbitrary grid — see `benchmark/geometry/tcoil/sweep.py`), generates each through the real
+platform path, and writes `benchmark/geometry/tcoil/sweep_out/report.json` plus a GDS+PNG per
+distinct case for a quick look. `src/passivelab/geometry/tcoil/rules.py`'s docstring records what
+that sweep found about where this repo's current parameter rules and the notebook's own usage
+disagree.
 
 ## Status (Phase 1)
 
 - **1.0–1.2 done**: notebook reverse-engineered, gdstk backend chosen, core interfaces + T-coil
-  plugin (`TCoilSpec`/`TCoilLayoutGenerator`) built and validated against the golden generator.
-- **1.3 T-Coil plugin (in progress)**: 1.3.1 added the plugin registry — `generate(spec)` now
-  dispatches to `TCoilLayoutGenerator` (or any other registered device) via
-  `src/passivelab/core/geometry/registry.py`, with zero `core/` → `tcoil/` coupling. Remaining:
-  layer/datatype legality fix (1.3.2), `spec.json` loader/CLI (1.3.3).
+  plugin built and validated against the golden generator.
+- **1.3 T-Coil plugin — done**: plugin registry + `generate(spec)` dispatch (1.3.1), layer/datatype
+  legality (1.3.2), `spec.json` loader/CLI (1.3.3), a notebook-validated parameter sweep (1.3.4),
+  this walkthrough (1.3.5).
 - **1.4+**: simulation, dataset, ANN, optimization pipelines — not started.
 
 Plan/board lives in the sibling `../Second Brain` vault; see `CLAUDE.md`.
