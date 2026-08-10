@@ -60,5 +60,5 @@ Before opening a PR:
 - CI must be green before review. `claude-review.yml` reads the CI result when reviewing.
 - Every sub-phase needs spec, tests, validation criteria, and docs (see `docs/AGENTS.md`). Add tests
   alongside the code that satisfies each sub-phase's validation criteria in the PRD.
-- Update root `README.md` when a **parent task** finishes (see `docs/AGENTS.md` ALWAYS) — not on
-  every subtask.
+- Update root `README.md` when a **parent task** finishes (see `docs/AGENTS.md` ALWAYS)
+- Review and refactor everytime a task is done

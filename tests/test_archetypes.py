@@ -1,17 +1,19 @@
 """Archetype journey tests — "as if these people use the tool" (sub-phase 1.2.2).
 
 The platform must serve three first-class archetypes (VISION.md / Master PRD §3). These tests
-prove each archetype's journey is **expressible through the core interfaces** using only
-in-memory fakes — no gdstk, no solver, no mlflow. They are also the discovery vehicle: every step
-a journey needs that 1.2.2 does not provide is marked ``OUT-OF-SCOPE 1.2.2`` and becomes a board
-task (see the vault's PassiveLAB board).
+prove each archetype's journey is **expressible through the core interfaces**. They are also the
+discovery vehicle: every step a journey needs that isn't provided yet is marked
+``OUT-OF-SCOPE <phase>`` and becomes a board task (see the vault's PassiveLAB board).
 
-Nothing here imports a device (tcoil) or a geometry kit (gdstk); the fakes conform to the
-Protocols structurally, exactly as a real plugin or a third party would.
+Originally (1.2.2) every journey ran on in-memory fakes only, since no real device or backend
+existed. 1.3 changed that for geometry: ``test_analog_designer_journey`` (below) now drives the
+**real** T-coil plugin through ``spec.json -> generate(spec)`` (1.3.1-1.3.4 built the pieces
+needed) — the one deliberate exception to "nothing here imports a device." The other two
+archetypes stay fake-only: their backends (``characterize``/``optimize``) are still 1.4/1.7.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from passivelab.core import (
     Candidate,
@@ -24,7 +26,11 @@ from passivelab.core import (
     PassiveSpec,
     Score,
     SimulationResult,
+    generate,
+    load_spec,
 )
+from passivelab.geometry.tcoil.templates import ALL_LAYERS
+import passivelab.geometry.tcoil  # noqa: F401 -- self-registers "tcoil"
 
 
 # --- fakes: structural implementations of the interfaces (no passivelab base classes) ---------
@@ -110,21 +116,38 @@ def run_search(optimizer, generator, backend, runner, steps):
 # --- archetype 1: analog / IC designer -------------------------------------------------------
 
 def test_analog_designer_journey():
-    """Designer states an Objective (target_value, max_area, min_voltage_margin) and gets an
-    optimized, implementable passive. generate + optimize compose through the interfaces."""
-    objective = Objective(targets={"inductance": 4e-10},
-                          constraints={"max_area": 500.0, "min_voltage_margin": 0.5})
-    opt = GridOptimizer([1, 2, 3, 4, 5])
-    best_candidate, best_score = run_search(opt, FauxGenerator(), FauxBackend(),
-                                            TargetRunner(objective), steps=5)
+    """States a device declaratively (spec.json), generates it through the real platform path,
+    and confirms the result is layer-legal and that sweeping the spec produces multiple,
+    genuinely distinct, inspectable geometries -- the real path now that 1.3.1-1.3.4 exist
+    (was a FauxSpec/FauxGenerator/GridOptimizer stub before 1.3)."""
+    spec = load_spec("examples/tcoil.spec.json")
+    spec.validate()
+    layout = generate(spec)  # real registry dispatch (1.3.1) through the real T-coil plugin
 
-    assert isinstance(best_candidate, Candidate)
-    assert best_candidate.spec.passive_type == "faux"
-    # turns=2 hits the target inductance exactly (1e-10 * 2**2 = 4e-10) within the area budget
-    assert best_candidate.spec.params["turns"] == 2
-    assert best_score.value == 0.0
-    # OUT-OF-SCOPE 1.2.2: a real spec.json entry point and PCell/xschem export are not interfaces
-    #   this phase provides -> board tasks (spec.json loader/CLI; PCell+xschem export path).
+    # Layer-legal GDS: the automatable stand-in for "matches the notebook" this repo has used
+    # since 1.3.2/1.3.4 (a live gdspy diff isn't possible -- see rules.py's docstring).
+    legal = {(l, 0) for l in ALL_LAYERS}
+    inventory = {(p.layer, p.datatype) for p in layout.cell.get_polygons()}
+    assert inventory <= legal, f"foreign (layer, datatype) pairs: {inventory - legal}"
+
+    # Inspectable sweep: multiple, genuinely distinct geometries from the same declarative shape
+    # (rendering them to PNG for actual human inspection is covered separately, by test_cli.py
+    # and 1.3.4's benchmark/geometry/tcoil/test_sweep.py -- this test proves the composition).
+    # Full fingerprint, not just polygon count -- different nseg values can coincidentally
+    # produce the same polygon count while the actual geometry (vertex coordinates) differs.
+    def _fingerprint(cell):
+        return tuple(sorted(
+            (p.layer, p.datatype, tuple((round(x, 6), round(y, 6)) for x, y in p.points))
+            for p in cell.get_polygons()
+        ))
+
+    swept = [generate(replace(spec, nseg=n)) for n in (6, 10, 14)]
+    assert all(len(l.cell.get_polygons()) > 0 for l in swept)
+    assert len({_fingerprint(l.cell) for l in swept}) == len(swept)
+
+    # OUT-OF-SCOPE 1.3: optimize()/characterize() have no real backend yet (1.4/1.7) -- a
+    # real objective -> optimized-candidate leg of this journey is still fake-only, tracked as
+    # its own board work; PCell/xschem export is a separate, later task regardless.
 
 
 # --- archetype 2: device researcher ----------------------------------------------------------
