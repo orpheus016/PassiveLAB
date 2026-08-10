@@ -13,6 +13,15 @@ silently "fixed" per the citation rule (contradictions must be noted, not auto-r
   (see generator.py). The ratio-to-coordinate conversion is a higher-level (dataset-sampling)
   concern, out of scope for this geometry-backend prototype -- `firY` is validated only as a
   real number here.
+- `SIZE_RANGE=(20,200)` doesn't cover the notebook's own real usage either (1.3.4 finding,
+  measured directly): the notebook's batch sampler (`one_sample()`,
+  reference/markdown/...md:739-740) derives `sizX`/`sizY` from `3*(nturn*gap)+wid+jitter`, not an
+  independent draw, and can reach ~300+ for larger `nseg`/`gap` combinations. A 200-sample sweep
+  faithful to that sampler (`benchmark/geometry/tcoil/sweep.py`) measured a **79% pass rate**
+  against this module's current ranges, with failures concentrated entirely on `sizX`/`sizY` (33
+  and 30 of 200 respectively) -- generation itself succeeds and stays layer-legal on 100% of
+  those samples regardless, only this module's independent range check disagrees with them.
+  Recorded, not widened here: this task's scope is validation, not a rules revision.
 """
 from __future__ import annotations
 

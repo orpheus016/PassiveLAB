@@ -161,6 +161,7 @@ venv.bak/
 # (regenerated every run, see benchmark/geometry/tests/)
 /out/
 benchmark/geometry/tests/report.json
+benchmark/geometry/tcoil/sweep_out/
 
 # Spyder project settings
 .spyderproject
