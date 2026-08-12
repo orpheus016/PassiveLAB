@@ -31,8 +31,10 @@ pytest benchmark/geometry/tcoil/benchmark_generation_speed.py -v -s   # + GDS si
 ```
 
 GDS preview rendering (`render_png`) moved to `src/passivelab/geometry/preview.py` in 1.3.3 (the
-CLI's default PNG output needs it too, and production code can't import from `benchmark/`) — the
-PNGs in `previews/` were generated with it before the move.
+CLI's default PNG output needs it too, and production code can't import from `benchmark/`), then
+to `src/passivelab/utils/preview.py` in the utils-centralization refactor (cross-cutting infra
+used by both `cli.py` and `benchmark/`, not a geometry-domain concern) — the PNGs in `previews/`
+were generated with it before either move.
 
 See `../README.md` for the cross-device validity+timing suite (`benchmark/geometry/tests/`),
 which now also exercises these cases via `benchmark.geometry.tcoil.cases`.

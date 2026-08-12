@@ -20,7 +20,7 @@ dev = ["pytest>=8"]
 # Benchmark-ecosystem tooling (algorithm/backend comparisons) — not part of the fast CI gate,
 # run on demand: pytest benchmark/ --benchmark-only. See benchmark/geometry/tcoil/README.md.
 bench = ["pytest-benchmark>=4", "matplotlib>=3.8"]
-# PNG preview rendering (geometry/preview.py) — the CLI's default output, `pip install -e ".[viz]"`.
+# PNG preview rendering (utils/preview.py) — the CLI's default output, `pip install -e ".[viz]"`.
 # Deliberately overlaps `bench`'s matplotlib pin rather than restructuring that extras group.
 viz = ["matplotlib>=3.8"]
 
