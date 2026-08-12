@@ -1,0 +1,15 @@
+{
+  "passive_type": "tcoil",
+  "wid": 5,
+  "gap": 8,
+  "sizX": 150,
+  "sizY": 120,
+  "firY": 10,
+  "tapseg": 6,
+  "nseg": 24,
+  "tapratio": 0.5,
+  "endratio": 0.5,
+  "Lext": 20,
+  "pad_siz": 50,
+  "includepad": true
+}
