@@ -13,6 +13,10 @@ The dependency arrow only ever points one way: a plugin imports ``core`` and cal
 :func:`register`/:func:`register_spec` on itself (typically as an import-time side effect in the
 plugin package's ``__init__.py`` — see ``geometry/tcoil/__init__.py``); ``core`` never imports the
 plugin.
+
+The two module-level registries below are ``passivelab.utils.registry.Registry`` instances
+(refactor pass, 1.3.6) -- this module keeps its own function names as thin wrappers so nothing
+downstream changes.
 """
 from __future__ import annotations
 
@@ -21,9 +25,10 @@ from typing import Type
 from passivelab.core.geometry.generator import LayoutGenerator
 from passivelab.core.geometry.spec import PassiveSpec
 from passivelab.core.types import Layout
+from passivelab.utils.registry import Registry
 
-_REGISTRY: dict[str, LayoutGenerator] = {}
-_SPEC_REGISTRY: dict[str, Type[PassiveSpec]] = {}
+_REGISTRY: Registry[LayoutGenerator] = Registry("LayoutGenerator")
+_SPEC_REGISTRY: Registry[Type[PassiveSpec]] = Registry("PassiveSpec class")
 
 
 def register(passive_type: str, generator: LayoutGenerator) -> None:
@@ -32,23 +37,12 @@ def register(passive_type: str, generator: LayoutGenerator) -> None:
     Raises if ``passive_type`` is already registered — a silent overwrite would hide a plugin
     naming collision rather than surface it.
     """
-    if passive_type in _REGISTRY:
-        raise ValueError(
-            f"passive_type {passive_type!r} is already registered to "
-            f"{_REGISTRY[passive_type]!r}"
-        )
-    _REGISTRY[passive_type] = generator
+    _REGISTRY.register(passive_type, generator)
 
 
 def get(passive_type: str) -> LayoutGenerator:
     """Look up the ``LayoutGenerator`` registered for ``passive_type``."""
-    try:
-        return _REGISTRY[passive_type]
-    except KeyError:
-        raise KeyError(
-            f"no LayoutGenerator registered for passive_type {passive_type!r}; "
-            f"registered types: {sorted(_REGISTRY)}"
-        ) from None
+    return _REGISTRY.get(passive_type)
 
 
 def generate(spec: PassiveSpec) -> Layout:
@@ -62,20 +56,9 @@ def register_spec(passive_type: str, spec_cls: Type[PassiveSpec]) -> None:
     """Register ``spec_cls`` as the ``PassiveSpec`` implementation for ``passive_type`` (1.3.3),
     so ``spec_loader.load_spec()`` can construct one from a ``spec.json``'s ``passive_type``
     field without guessing or importing the device."""
-    if passive_type in _SPEC_REGISTRY:
-        raise ValueError(
-            f"passive_type {passive_type!r} already has a registered spec class: "
-            f"{_SPEC_REGISTRY[passive_type]!r}"
-        )
-    _SPEC_REGISTRY[passive_type] = spec_cls
+    _SPEC_REGISTRY.register(passive_type, spec_cls)
 
 
 def get_spec(passive_type: str) -> Type[PassiveSpec]:
     """Look up the ``PassiveSpec`` class registered for ``passive_type``."""
-    try:
-        return _SPEC_REGISTRY[passive_type]
-    except KeyError:
-        raise KeyError(
-            f"no PassiveSpec class registered for passive_type {passive_type!r}; "
-            f"registered types: {sorted(_SPEC_REGISTRY)}"
-        ) from None
+    return _SPEC_REGISTRY.get(passive_type)

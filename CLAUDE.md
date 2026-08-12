@@ -61,4 +61,7 @@ Before opening a PR:
 - Every sub-phase needs spec, tests, validation criteria, and docs (see `docs/AGENTS.md`). Add tests
   alongside the code that satisfies each sub-phase's validation criteria in the PRD.
 - Update root `README.md` when a **parent task** finishes (see `docs/AGENTS.md` ALWAYS)
-- Review and refactor everytime a task is done
+- Review and refactor everytime a task is done. Concretely: before writing a new helper
+  function, check `src/passivelab/utils/` and the rest of the codebase for one that already does
+  the job (see the `utils-reviewer` agent, `docs/AGENTS.md`'s "Agent roles"); if a helper is
+  needed in a second place, move it to `utils/` instead of copying it a second time.

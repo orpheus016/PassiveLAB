@@ -67,6 +67,10 @@ The four stable core APIs — `generate(spec)`, `characterize(layout)`,
 
 - **Architecture Reviewer** — detect duplicate abstractions, prevent notebook/plugin logic
   leaking into core, review interfaces, own phase gates. *Cannot write production code.*
+- **utils-reviewer** (`.claude/agents/utils-reviewer.md`) — the Architecture Reviewer's
+  duplicate-helper check, made routine: before a new helper function is written, checks
+  `src/passivelab/utils/` and the rest of the codebase for one that already does the job.
+  Reports what to reuse or what to extract; doesn't write the refactor itself unless asked.
 - **Reverse-Engineering Agent** — analyze existing notebooks/tools, extract workflow graphs,
   identify dependencies. Produces reports.
 - **Implementation Agent** — build modules against approved interfaces. *Cannot create new
