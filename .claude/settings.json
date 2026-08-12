@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\James\\AppData\\Local\\Programs\\Python\\Python313\\python.exe \"D:\\James\\Knowledge Base\\PassiveLAB\\.claude\\hooks\\roam-compile-ups.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\James\\AppData\\Local\\Programs\\Python\\Python313\\python.exe \"D:\\James\\Knowledge Base\\PassiveLAB\\.claude\\hooks\\roam-verify-stop.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
