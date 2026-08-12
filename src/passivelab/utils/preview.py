@@ -3,10 +3,12 @@ GUI needed" viewer. Neither gdstk nor the `klayout` PyPI package (UI-stripped) s
 rendering; this is the practical alternative (same pattern photonics tooling like gdsfactory
 uses for Jupyter/IDE previews).
 
-Device-agnostic (operates on any gdstk.Cell) -- lives here, not per-device, per the
-geometry/GOAL.md folder pattern. Moved from benchmark/geometry/tcoil/preview.py in 1.3.3: the CLI
-(a production entry point) needs it for its default PNG output, and production code can't import
-from benchmark/ (dev-only tooling, not part of the installed package).
+Cross-cutting infra, not a geometry-domain concern despite operating on `gdstk.Cell` -- it's
+used by both product code (`cli.py`'s default PNG output) and dev tooling (`benchmark/`'s sweep
+previews), exactly what `utils/__init__.py` defines this package as. Moved here from
+`geometry/preview.py` in the utils-centralization refactor (having previously moved from
+`benchmark/geometry/tcoil/preview.py` in 1.3.3, when the driver was narrower: "production code
+can't import from `benchmark/`"). Same file, no functional change.
 
 Needs matplotlib (``pip install -e ".[viz]"`` or ``.[bench]"``, which already pulls it in).
 """

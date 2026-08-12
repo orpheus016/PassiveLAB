@@ -43,7 +43,7 @@ def generate_command(spec_path: str | pathlib.Path, out_dir: str | pathlib.Path,
     lib.write_gds(str(gds_path))
 
     if png:
-        from passivelab.geometry.preview import render_png  # lazy: matplotlib is a `viz` extra
+        from passivelab.utils.preview import render_png  # lazy: matplotlib is a `viz` extra
         render_png(layout.cell, cell_dir / f"{layout.cell.name}.png", title=layout.cell.name)
 
     return gds_path
