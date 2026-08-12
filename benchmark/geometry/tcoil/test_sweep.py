@@ -37,7 +37,7 @@ def test_sweep_matches_notebook_sampling_fidelity(tmp_path):
     OUT_DIR.mkdir(exist_ok=True)
 
     try:
-        from passivelab.geometry.preview import render_png
+        from passivelab.utils.preview import render_png
     except ImportError:
         render_png = None  # `viz`/`bench` extra not installed; report still gets written
 
