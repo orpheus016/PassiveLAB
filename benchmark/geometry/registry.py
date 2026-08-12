@@ -8,13 +8,16 @@ cases generically -- adding MoM Cap or another passive later means adding a `cas
 touching the shared test.
 
 Deliberately separate from ``core``'s registry: benchmark cases aren't part of the platform
-contract, just dev-tooling fixtures.
+contract, just dev-tooling fixtures. Built on ``passivelab.utils.registry.Registry`` (refactor
+pass, 1.3.6) -- previously a hand-rolled dict with the same register/get-all shape as
+``core.geometry.registry``, which is exactly the duplication that module now exists to avoid.
 """
 from __future__ import annotations
 
 from typing import NamedTuple
 
 from passivelab.core import PassiveSpec
+from passivelab.utils.registry import Registry
 
 
 class BenchmarkCase(NamedTuple):
@@ -22,14 +25,12 @@ class BenchmarkCase(NamedTuple):
     spec: PassiveSpec
 
 
-_CASES: dict[str, list[BenchmarkCase]] = {}
+_CASES: Registry[list[BenchmarkCase]] = Registry("benchmark cases")
 
 
 def register_cases(passive_type: str, cases: list[BenchmarkCase]) -> None:
-    if passive_type in _CASES:
-        raise ValueError(f"passive_type {passive_type!r} already has registered benchmark cases")
-    _CASES[passive_type] = list(cases)
+    _CASES.register(passive_type, list(cases))
 
 
 def all_cases() -> dict[str, list[BenchmarkCase]]:
-    return dict(_CASES)
+    return _CASES.items()
