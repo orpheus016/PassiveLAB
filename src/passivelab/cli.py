@@ -23,6 +23,7 @@ import sys
 import gdstk
 
 import passivelab.geometry.tcoil  # noqa: F401 -- self-registers "tcoil" (spec class + generator)
+from passivelab.config import paths
 from passivelab.core import generate, load_spec
 from passivelab.scripts.sweep import sweep_command
 
@@ -55,12 +56,14 @@ def main(argv: list[str] | None = None) -> int:
 
     gen = sub.add_parser("generate", help="generate(spec) from a spec.json")
     gen.add_argument("spec_path", help="path to a spec.json")
-    gen.add_argument("--out-dir", default="out", help="output directory (default: out)")
+    gen.add_argument("--out-dir", default=paths.DEFAULT_OUT_DIR,
+                      help=f"output directory (default: {paths.DEFAULT_OUT_DIR})")
     gen.add_argument("--no-png", action="store_true", help="skip PNG preview rendering")
 
     swp = sub.add_parser("sweep", help="generate a reproducible N-sample sweep from a sweep-spec.json")
     swp.add_argument("spec_path", help="path to a sweep-spec.json")
-    swp.add_argument("--out-dir", default="out", help="output directory (default: out)")
+    swp.add_argument("--out-dir", default=paths.DEFAULT_OUT_DIR,
+                      help=f"output directory (default: {paths.DEFAULT_OUT_DIR})")
     swp.add_argument("--no-png", action="store_true", help="skip PNG preview rendering")
 
     args = parser.parse_args(argv)
