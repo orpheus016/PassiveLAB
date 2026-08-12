@@ -42,6 +42,14 @@ transforms, PDK-stackup reading), extract it into `geometry/common/`. Not built 
 one device (`tcoil/`) there's nothing proven to be shared yet, and guessing the shared surface
 from a single example risks getting it wrong (Phase 1 PRD §3: "do not generalize prematurely").
 
+**`sampling.py`** (optional per-device leaf, added when a device needs it): random parameter
+sampling faithful to an external reference distribution (e.g. tcoil's notebook-derived
+`sample_tcoil_spec()`/`sweep()`). Doesn't fit `generator.py` (pure geometry orchestration),
+`rules.py` (validation), or `templates.py` (geometry primitives) -- it's device-domain math like
+any of those, just a different kind, so it gets its own file rather than being force-fit into one
+of the others. Same dependency direction as the rest of the folder: may import `rules.py` (for a
+shared derivation like `size_bounds()`) and `spec.py`, never the reverse.
+
 `passivelab/__init__.py` stays deliberately empty (no public API guessed ahead of sub-phase
 1.2's architecture review) — the per-device folders here are real, working code, wrapped behind
 the approved `LayoutGenerator`/`PassiveSpec` interfaces, not throwaway code.

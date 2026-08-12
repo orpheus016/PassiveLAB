@@ -1,10 +1,13 @@
-"""``passivelab`` CLI (sub-phase 1.3.3): ``spec.json -> generate(spec) -> GDS (+ PNG)``, the
-analog-designer archetype's entry point -- state a device declaratively instead of writing Python.
+"""``passivelab`` CLI (sub-phase 1.3.3, `sweep` added in the sweep-as-a-feature refactor):
+``spec.json -> generate(spec) -> GDS (+ PNG)`` and ``sweep-spec.json -> N-sample sweep -> GDS+PNG
+previews + report.json``, the analog-designer and dataset-generation entry points -- state a
+device (or a sweep of one) declaratively instead of writing Python.
 
-``generate_command()`` is the testable core (returns the written GDS path); ``main()`` is the
-thin argparse wrapper, also registered as the ``passivelab`` console script
-(``pyproject.toml [project.scripts]``). Run as ``python -m passivelab.cli generate spec.json`` or,
-once installed, ``passivelab generate spec.json``.
+``generate_command()``/``sweep_command()`` (the latter in ``scripts/sweep.py``) are the testable
+cores; ``main()`` is the thin argparse wrapper, also registered as the ``passivelab`` console
+script (``pyproject.toml [project.scripts]``). Run as
+``python -m passivelab.cli generate spec.json`` / ``... sweep sweep-spec.json`` or, once
+installed, ``passivelab generate spec.json`` / ``passivelab sweep sweep-spec.json``.
 
 Imports every known device plugin package below so its ``__init__.py`` self-registration
 (spec class + generator, see geometry/tcoil/__init__.py) has run before ``load_spec``/``generate``
@@ -21,6 +24,7 @@ import gdstk
 
 import passivelab.geometry.tcoil  # noqa: F401 -- self-registers "tcoil" (spec class + generator)
 from passivelab.core import generate, load_spec
+from passivelab.scripts.sweep import sweep_command
 
 
 def generate_command(spec_path: str | pathlib.Path, out_dir: str | pathlib.Path, *,
@@ -54,10 +58,18 @@ def main(argv: list[str] | None = None) -> int:
     gen.add_argument("--out-dir", default="out", help="output directory (default: out)")
     gen.add_argument("--no-png", action="store_true", help="skip PNG preview rendering")
 
+    swp = sub.add_parser("sweep", help="generate a reproducible N-sample sweep from a sweep-spec.json")
+    swp.add_argument("spec_path", help="path to a sweep-spec.json")
+    swp.add_argument("--out-dir", default="out", help="output directory (default: out)")
+    swp.add_argument("--no-png", action="store_true", help="skip PNG preview rendering")
+
     args = parser.parse_args(argv)
 
     try:
-        gds_path = generate_command(args.spec_path, args.out_dir, png=not args.no_png)
+        if args.command == "generate":
+            result_path = generate_command(args.spec_path, args.out_dir, png=not args.no_png)
+        else:  # "sweep"
+            result_path = sweep_command(args.spec_path, args.out_dir, png=not args.no_png)
     except (ValueError, KeyError, TypeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -66,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
               f"or rerun with --no-png)", file=sys.stderr)
         return 1
 
-    print(gds_path)
+    print(result_path)
     return 0
 
 

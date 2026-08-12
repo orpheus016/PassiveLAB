@@ -75,12 +75,21 @@ an unknown `passive_type` fails with one line (`error: ...`), not a traceback.
 ## Sweeping parameters
 
 ```bash
+passivelab sweep examples/tcoil.sweep.json --out-dir out
+```
+
+Generates an N-sample sweep from a sweep-spec.json (`n`/`seed` + the two fields the notebook's
+sampler otherwise hardcodes, `includepad`/`pad_siz`) — every randomized geometry field is sampled
+the same way the golden notebook itself samples them, not an arbitrary grid (see
+`src/passivelab/geometry/tcoil/sampling.py`). Writes `out/report.json` plus a GDS+PNG per distinct
+`(nseg, includepad)` case for a quick look.
+
+The same mechanism backs a notebook-fidelity regression test, run on demand:
+
+```bash
 pytest benchmark/geometry/tcoil/test_sweep.py -v -s
 ```
 
-Runs 200 parameter combinations sampled the same way the golden notebook itself samples them (not
-an arbitrary grid — see `benchmark/geometry/tcoil/sweep.py`), generates each through the real
-platform path, and writes `benchmark/geometry/tcoil/sweep_out/report.json` plus a GDS+PNG per
-distinct case for a quick look. `src/passivelab/geometry/tcoil/rules.py`'s docstring records what
-that sweep found about where this repo's current parameter rules and the notebook's own usage
-disagree.
+which writes `benchmark/geometry/tcoil/sweep_out/report.json` instead.
+`src/passivelab/geometry/tcoil/rules.py`'s docstring records what that sweep found about where
+this repo's current parameter rules and the notebook's own usage disagree.
