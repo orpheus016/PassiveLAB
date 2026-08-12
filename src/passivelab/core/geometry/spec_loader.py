@@ -31,8 +31,11 @@ def spec_from_dict(data: dict) -> PassiveSpec:
         raise ValueError(f"malformed spec.json for passive_type {passive_type!r}: {e}") from e
 
 
-def load_spec(path: str | pathlib.Path) -> PassiveSpec:
-    """Read a ``spec.json`` file and construct its ``PassiveSpec``."""
+def read_spec_json(path: str | pathlib.Path) -> dict:
+    """Read and parse a JSON spec file into a dict, without constructing a ``PassiveSpec`` --
+    shared by ``load_spec()`` and ``scripts/sweep.py``'s sweep-spec loader, which need the same
+    "read this file, raise a clean ValueError on bad JSON/shape" behavior but only one of them
+    builds a ``PassiveSpec`` from the result."""
     path = pathlib.Path(path)
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -40,4 +43,9 @@ def load_spec(path: str | pathlib.Path) -> PassiveSpec:
         raise ValueError(f"{path}: invalid JSON: {e}") from e
     if not isinstance(data, dict):
         raise ValueError(f"{path}: spec.json must be a JSON object, got {type(data).__name__}")
-    return spec_from_dict(data)
+    return data
+
+
+def load_spec(path: str | pathlib.Path) -> PassiveSpec:
+    """Read a ``spec.json`` file and construct its ``PassiveSpec``."""
+    return spec_from_dict(read_spec_json(path))

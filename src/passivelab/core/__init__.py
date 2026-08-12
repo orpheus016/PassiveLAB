@@ -20,7 +20,7 @@ from passivelab.core.geometry.registry import get_spec
 from passivelab.core.geometry.registry import register as register_generator
 from passivelab.core.geometry.registry import register_spec
 from passivelab.core.geometry.spec import PassiveSpec
-from passivelab.core.geometry.spec_loader import load_spec, spec_from_dict
+from passivelab.core.geometry.spec_loader import load_spec, read_spec_json, spec_from_dict
 from passivelab.core.optimization.optimizer import Optimizer
 from passivelab.core.types import (
     Candidate,
@@ -59,4 +59,5 @@ __all__ = [
     "get_spec",
     "load_spec",
     "spec_from_dict",
+    "read_spec_json",
 ]

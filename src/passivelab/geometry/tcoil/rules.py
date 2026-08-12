@@ -18,7 +18,8 @@ Note on fields that don't cleanly validate against the PRD table, recorded rathe
 but the golden notebook's own batch sampler (`one_sample()`, reference/markdown/...md:739-740)
 never draws them independently -- it derives them from `3*(nturn*gap)+wid+jitter[0,100]`, which
 can reach ~300+ for larger `nseg`/`gap` combinations. A 200-sample sweep faithful to that sampler
-(`benchmark/geometry/tcoil/sweep.py`) measured only a 79% pass rate against the old flat range,
+(`geometry/tcoil/sampling.py`, at the time still `benchmark/geometry/tcoil/sweep.py`) measured
+only a 79% pass rate against the old flat range,
 with every failure on `sizX`/`sizY` -- generation itself stayed layer-legal on 100% of those
 samples, only the independent range check disagreed with the notebook's own distribution. Per
 James's instruction that dataset generation is ground truth, `size_bounds()` below now derives
