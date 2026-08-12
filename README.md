@@ -11,7 +11,8 @@ frontend that only calls those APIs. See `docs/PRD/Phase 1 — TCoil Platformiza
 
 ```bash
 pip install -e ".[dev,viz]"
-python -m passivelab.cli generate examples/tcoil.spec.json
+passivelab generate examples/tcoil.spec.json --out-dir out
+# python -m passivelab.cli generate examples/tcoil.spec.json
 # -> out/tcoil/tcoil.gds + out/tcoil/tcoil.png
 ```
 
@@ -63,7 +64,7 @@ Full docs: `docs/ARCHITECTURE.md`, `docs/VISION.md`, `docs/PRD/`, one `GOAL.md` 
 `examples/tcoil.spec.json`) — no wrapper, no translation. The CLI:
 
 ```bash
-python -m passivelab.cli generate my_spec.json --out-dir out --no-png
+python -m passivelab.cli generate examples/tcoil.spec.json --out-dir out --no-png
 ```
 
 loads the spec, calls `spec.validate()` (parameter-range checks only — DRC is separate,
@@ -73,6 +74,12 @@ checked against the plugin's real PDK layer set before it ever reaches you — a
 an unknown `passive_type` fails with one line (`error: ...`), not a traceback.
 
 ## Sweeping parameters
+
+```bash
+python -m passivelab.cli sweep examples/tcoil.sweep.json --out-dir out
+```
+
+run below if already installed with `pip install -e ".[dev,viz]"`.
 
 ```bash
 passivelab sweep examples/tcoil.sweep.json --out-dir out
