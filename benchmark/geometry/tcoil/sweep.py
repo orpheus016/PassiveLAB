@@ -13,6 +13,10 @@ The "Tapseg Check" retry loop below (`while True: ... continue`) is provably the
 as `generator.py`'s `flag_add_tap` union-of-cases under `if tid == tapseg:` -- the notebook
 retries until it draws a `tapseg` that would fire that branch, so every sample this function
 produces should make our generator emit a TAP port marker. See test_sweep.py for the assertion.
+
+sizX/sizY (1.3.7): the derivation formula lives in `rules.size_bounds()` now, not duplicated
+here -- `rules.py`'s own `validate()` needed the identical formula (the notebook-fidelity gap
+this module's docstring used to record), so it's the shared home for both callers.
 """
 from __future__ import annotations
 
@@ -20,6 +24,7 @@ import random
 from collections.abc import Iterator
 
 from passivelab.geometry.tcoil import TCoilSpec
+from passivelab.geometry.tcoil.rules import size_bounds
 
 
 def sample_tcoil_spec(rng: random.Random) -> TCoilSpec:
@@ -29,7 +34,8 @@ def sample_tcoil_spec(rng: random.Random) -> TCoilSpec:
     - wid/gap (728-729): gap is wid + jitter, not independently drawn.
     - nseg (730): only 6 discrete values -- {2, 6, 10, 14, 18, 22} -- not a continuous range.
     - tapseg (731) + the Tapseg Check (734-737): retried until the tap branch would fire.
-    - sizX/sizY (739-740): derived from nturn/gap/wid + jitter, not an independent [20,200] range.
+    - sizX/sizY (739-740): derived from nturn/gap/wid + jitter (`rules.size_bounds()`), not an
+      independent [20,200] range.
     - tapratio/endratio (741-742): independently uniform, matches rules.py's ranges.
     - firY (743-744): a *ratio* of sizY, not an independent absolute coordinate.
     - Lext (745): gap + 5, not independently positive.
@@ -39,7 +45,6 @@ def sample_tcoil_spec(rng: random.Random) -> TCoilSpec:
         gap = wid + rng.randint(3, 12)
         nseg = rng.randint(0, 5) * 4 + 2
         tapseg = rng.randint(0, nseg // 4) * 4
-        nturn = (nseg - 1) // 8 + 1
 
         cur_metal = ((tapseg // 4) + 1) % 2
         id_turn = tapseg // 8
@@ -53,8 +58,9 @@ def sample_tcoil_spec(rng: random.Random) -> TCoilSpec:
         if not tapseg_ok:
             continue
 
-        sizX = 3 * (nturn * gap) + wid + rng.randint(0, 100)
-        sizY = 3 * (nturn * gap) + wid + rng.randint(0, 100)
+        size_lo, _ = size_bounds(wid, gap, nseg)
+        sizX = size_lo + rng.randint(0, 100)
+        sizY = size_lo + rng.randint(0, 100)
         tapratio = rng.uniform(0.3, 0.8)
         endratio = rng.uniform(0.2, 0.8)
         firY = int(sizY * rng.uniform(0.1, 0.9))

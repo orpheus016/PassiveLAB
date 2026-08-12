@@ -6,10 +6,11 @@ import dataclasses
 import pytest
 
 from passivelab.geometry.tcoil import TCoilParams
-from passivelab.geometry.tcoil.rules import validate
+from passivelab.geometry.tcoil.rules import size_bounds, validate
 
 VALID = TCoilParams(wid=7, gap=12, sizX=150, sizY=120, firY=10, tapseg=4, nseg=10,
                      tapratio=0.5, endratio=0.5, Lext=30, pad_siz=50, includepad=True)
+# nturn = (10-1)//8+1 = 2 -> size_bounds(7, 12, 10) == (79, 179); VALID's 150/120 sit inside it.
 
 
 def test_valid_params_pass():
@@ -17,8 +18,8 @@ def test_valid_params_pass():
 
 
 @pytest.mark.parametrize("field,bad_value", [
-    ("sizX", 10),          # below [20, 200]
-    ("sizY", 300),         # above [20, 200]
+    ("sizX", 10),          # below the derived bound (79)
+    ("sizY", 300),         # above the derived bound (179)
     ("wid", 1),            # below [3, 12]
     ("gap", 30),           # above [6, 24]
     ("nseg", 30),          # above [2, 24]
@@ -37,3 +38,15 @@ def test_tapseg_must_be_within_nseg():
     params = dataclasses.replace(VALID, tapseg=VALID.nseg)  # tapseg == nseg, invalid
     with pytest.raises(ValueError):
         validate(params)
+
+
+def test_sizX_sizY_bounds_are_derived_from_wid_gap_nseg_not_a_flat_constant():
+    """1.3.7: the same sizX=150 that's valid at nseg=10 (nturn=2, bounds [79,179]) must become
+    invalid at nseg=2 (nturn=1, bounds [43,143]) -- proving the check tracks (wid, gap, nseg)
+    instead of a fixed range."""
+    assert size_bounds(7, 12, 10) == (79, 179)
+    assert size_bounds(7, 12, 2) == (43, 143)
+
+    smaller_nturn = dataclasses.replace(VALID, nseg=2, tapseg=0)
+    with pytest.raises(ValueError, match="sizX"):
+        validate(smaller_nturn)

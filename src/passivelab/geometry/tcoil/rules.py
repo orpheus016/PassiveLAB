@@ -1,8 +1,8 @@
 """Parameter validation for TCoilParams, from the PRD's range table
 (docs/PRD/Phase 1 -- TCoil Platformization.md, sub-phase 1.3).
 
-Note on two fields that don't cleanly validate against the PRD table, recorded rather than
-silently "fixed" per the citation rule (contradictions must be noted, not auto-resolved):
+Note on fields that don't cleanly validate against the PRD table, recorded rather than silently
+"fixed" per the citation rule (contradictions must be noted, not auto-resolved):
 - The PRD table lists `pad_siz`/`Lext` as *fixed* (50um / 5um). But the golden notebook's own
   `CreateTCoilTraceVanilla` defaults to `Lext=20` and its own smoke-test call uses `Lext=30`
   (reference/markdown/TCoil_Dataset_Generator_and_Training.md, cell 10) -- neither matches the
@@ -13,15 +13,17 @@ silently "fixed" per the citation rule (contradictions must be noted, not auto-r
   (see generator.py). The ratio-to-coordinate conversion is a higher-level (dataset-sampling)
   concern, out of scope for this geometry-backend prototype -- `firY` is validated only as a
   real number here.
-- `SIZE_RANGE=(20,200)` doesn't cover the notebook's own real usage either (1.3.4 finding,
-  measured directly): the notebook's batch sampler (`one_sample()`,
-  reference/markdown/...md:739-740) derives `sizX`/`sizY` from `3*(nturn*gap)+wid+jitter`, not an
-  independent draw, and can reach ~300+ for larger `nseg`/`gap` combinations. A 200-sample sweep
-  faithful to that sampler (`benchmark/geometry/tcoil/sweep.py`) measured a **79% pass rate**
-  against this module's current ranges, with failures concentrated entirely on `sizX`/`sizY` (33
-  and 30 of 200 respectively) -- generation itself succeeds and stays layer-legal on 100% of
-  those samples regardless, only this module's independent range check disagrees with them.
-  Recorded, not widened here: this task's scope is validation, not a rules revision.
+
+`sizX`/`sizY` (resolved, 1.3.7): these were originally an independent flat `SIZE_RANGE=(20,200)`,
+but the golden notebook's own batch sampler (`one_sample()`, reference/markdown/...md:739-740)
+never draws them independently -- it derives them from `3*(nturn*gap)+wid+jitter[0,100]`, which
+can reach ~300+ for larger `nseg`/`gap` combinations. A 200-sample sweep faithful to that sampler
+(`benchmark/geometry/tcoil/sweep.py`) measured only a 79% pass rate against the old flat range,
+with every failure on `sizX`/`sizY` -- generation itself stayed layer-legal on 100% of those
+samples, only the independent range check disagreed with the notebook's own distribution. Per
+James's instruction that dataset generation is ground truth, `size_bounds()` below now derives
+the same formula the sampler uses, and `validate()` checks against it instead of a flat constant;
+`sweep.py` imports `size_bounds()` rather than re-deriving the formula a second time.
 """
 from __future__ import annotations
 
@@ -30,12 +32,21 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # type-only: spec.py imports this module's validate() at runtime, so a
     from passivelab.geometry.tcoil.spec import TCoilParams  # real import here would cycle back
 
-SIZE_RANGE = (20, 200)       # sizX, sizY (um)
 WID_RANGE = (3, 12)          # coil segment width (um)
 GAP_RANGE = (6, 24)          # adjacent-segment center-line distance (um)
 TOTAL_SEG_RANGE = (2, 24)    # nseg
 TAP_RATIO_RANGE = (0.30, 0.80)   # tapratio, fraction (PRD: 30-80%)
 END_RATIO_RANGE = (0.20, 0.80)   # endratio, fraction (PRD: 20-80%)
+
+
+def size_bounds(wid: float, gap: float, nseg: int) -> tuple[float, float]:
+    """The real sizX/sizY range for a given (wid, gap, nseg): the golden notebook's own sampler
+    (one_sample(), reference/markdown/...md:739-740) derives sizX/sizY as
+    `3*(nturn*gap)+wid+jitter[0,100]`, not an independent draw -- sizX and sizY use the identical
+    formula, so this is called once per field with the same (wid, gap, nseg)."""
+    nturn = (nseg - 1) // 8 + 1
+    lo = 3 * (nturn * gap) + wid
+    return lo, lo + 100
 
 
 def validate(params: TCoilParams) -> None:
@@ -46,8 +57,9 @@ def validate(params: TCoilParams) -> None:
         if not (lo <= value <= hi):
             errors.append(f"{name}={value!r} out of range [{lo}, {hi}]")
 
-    _range("sizX", params.sizX, *SIZE_RANGE)
-    _range("sizY", params.sizY, *SIZE_RANGE)
+    size_lo, size_hi = size_bounds(params.wid, params.gap, params.nseg)
+    _range("sizX", params.sizX, size_lo, size_hi)
+    _range("sizY", params.sizY, size_lo, size_hi)
     _range("wid", params.wid, *WID_RANGE)
     _range("gap", params.gap, *GAP_RANGE)
     _range("nseg", params.nseg, *TOTAL_SEG_RANGE)

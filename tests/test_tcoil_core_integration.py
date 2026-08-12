@@ -18,8 +18,10 @@ import re
 from passivelab.core import Dataset, DatasetPipeline, Metrics, SimulationResult
 from passivelab.geometry.tcoil import TCoilLayoutGenerator, TCoilSpec
 
-BASELINE_FIELDS = dict(wid=7, gap=12, sizX=150, sizY=120, firY=10, tapratio=0.5, endratio=0.5,
+BASELINE_FIELDS = dict(wid=7, gap=12, sizX=100, sizY=90, firY=10, tapratio=0.5, endratio=0.5,
                        Lext=30, pad_siz=50, includepad=True)
+# sizX/sizY sit inside rules.size_bounds(7, 12, nseg) == (43, 143) for every nseg in the sweep
+# below (nturn stays 1 for nseg in {2,4,6,8}) -- 1.3.7 made that bound derived, not a flat range.
 
 
 class FakeBackend:
