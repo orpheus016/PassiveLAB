@@ -1,0 +1,107 @@
+"""Port re-embedding + port-definition mapping for the openEMS backend (sub-phase 1.4.1).
+
+Pure ``gdstk``/Python logic, no ``openEMS``/``CSXCAD`` import -- independently unit-testable
+without the solver installed.
+
+**Why this module exists (load-bearing, not cosmetic):** ``geometry/tcoil/generator.py``'s
+``split_ports()`` strips the openEMS-only port-marker layers (``PORT_START+1``..``+3`` = 201-203)
+out of the PDK-facing cell into a separate ``layout.metadata["ports_cell"]``, so the GDS handed to
+real PDK tools never carries non-PDK layer numbers. That is correct for that purpose, but it means
+``layout.cell`` alone has zero port markers. The vendored ``util_simulation_setup.addPorts_to_CSX``
+finds ports by scanning whatever polygons were actually read from the GDS file for a layer number
+that (a) isn't a real stackup metal and (b) is in ``simulation_ports.portlayers`` -- if a port's
+layer is simply absent from the GDS, that loop finds nothing for it, no ``FDTD.AddLumpedPort(...)``
+call happens, and no exception is raised: the simulation would silently have no excitation for that
+port. So the solver-facing GDS must always be built from the *union* of ``layout.cell`` and
+``layout.metadata["ports_cell"]`` -- never from ``layout.cell`` alone.
+
+**Port-to-metal convention is T-coil-specific, not generalized.** The via-port definitions below
+(``from_layername``/``to_layername`` per port layer) are copied verbatim from the golden
+reference's 3-port T-coil sweep. Generalizing a port/reference-plane/de-embedding convention across
+passive types is explicitly board task **1.4.2**'s scope, not invented here -- 1.4.1's own
+validation bar is "the reference sweep on a known T-coil geometry," matching how ``scripts/
+sweep.py`` stays tcoil-only today for the same "don't design past a sample of one" reason
+(``geometry/GOAL.md``).
+
+**Port 2 (TAP) is genuinely optional.** ``generator.py``'s tap-port emission (layer 202) is
+conditional on the sampled geometry (``flag_add_tap``) -- not every T-coil sample has one. Assuming
+a fixed 3-port topology would crash port 2's S-parameter calculation (a ``None`` ``CSXport``) on any
+untapped sample. Port definitions are therefore derived from what's *actually present* in the
+merged cell, not hardcoded to 3.
+"""
+from __future__ import annotations
+
+from typing import NamedTuple
+
+import gdstk
+
+PORT_START = 200  # passivelab.geometry.tcoil.templates.PORT_START, duplicated here to avoid this
+                  # solver plugin importing the geometry package (core/tests/test_no_leakage.py's
+                  # invariant extends to solver plugins by the same logic, even though this module
+                  # sits outside core/ -- keeping solvers device-agnostic is the same principle).
+PORT_COUNT = 4    # layers PORT_START..PORT_START+PORT_COUNT-1; PORT_START itself (200) is unused.
+
+# Golden-reference via-port convention (TCoil_Dataset_Generator_and_Training.py's simulator_openems
+# section): every port is a vertical via port between Metal4 and the layer named below, Z0=50 ohm.
+_PORT_METAL_CONVENTION: dict[int, tuple[str, str]] = {
+    PORT_START + 1: ("Metal4", "TopMetal2"),  # port 1: PAD
+    PORT_START + 2: ("Metal4", "Metal5"),     # port 2: TAP (optional -- see module docstring)
+    PORT_START + 3: ("Metal4", "Metal5"),     # port 3: CIR
+}
+
+
+class PortDef(NamedTuple):
+    portnumber: int
+    source_layernum: int
+    from_layername: str
+    to_layername: str
+    port_z0: float = 50.0
+    voltage: float = 1.0
+    direction: str = "z"
+
+
+def merge_layout_for_solver(layout) -> gdstk.Cell:
+    """Union ``layout.cell`` (PDK-clean geometry) with ``layout.metadata["ports_cell"]`` (the
+    port markers ``split_ports()`` removed) into one new cell, without mutating either input --
+    this is the cell that must be written to the GDS file handed to the solver's ``gds_reader``.
+    Raises ``KeyError`` if ``layout.metadata`` has no ``"ports_cell"`` -- a `Layout` without one
+    can't be simulated safely (see module docstring), so failing loudly here beats a silent
+    zero-excitation simulation later.
+    """
+    ports_cell = layout.metadata["ports_cell"]
+    merged = gdstk.Cell(f"{layout.cell.name}_solver")
+    merged.add(*(p.copy() for p in layout.cell.polygons))
+    merged.add(*(p.copy() for p in layout.cell.paths))
+    merged.add(*(p.copy() for p in ports_cell.polygons))
+    merged.add(*(p.copy() for p in ports_cell.paths))
+    return merged
+
+
+def derive_port_definitions(ports_cell: gdstk.Cell) -> list[PortDef]:
+    """Scan ``ports_cell`` (or an already-merged cell) for which of the T-coil port layers
+    (201/202/203) actually have geometry, and return a ``PortDef`` for each, numbered **1..N
+    contiguously by presence** (layer order), not by ``layernum - PORT_START``.
+
+    This matters: ``all_simulation_ports.get_port_by_number(n)`` indexes its internal list as
+    ``self.ports[n-1]`` (vendored ``util_simulation_setup.py``) -- it assumes portnumbers are
+    contiguous starting at 1 with no gaps. If the tap port (202) is absent and PAD/CIR (201/203)
+    kept their "natural" numbers 1 and 3, port 3 would sit at list index 1, and
+    ``get_port_by_number(3)`` would read the wrong port (or index out of range). Renumbering
+    contiguously by presence sidesteps that -- e.g. an untapped sample gets a clean 2-port S11/S21/
+    S12/S22 measurement over its two physical ports, which is standard practice for a reduced port
+    set, not a change in what's physically measured.
+    """
+    present_layers = {p.layer for p in ports_cell.polygons}
+    present_layers |= {layer for p in ports_cell.paths for layer in p.layers}
+
+    present_source_layers = [ln for ln in sorted(_PORT_METAL_CONVENTION) if ln in present_layers]
+    port_defs = []
+    for portnumber, layernum in enumerate(present_source_layers, start=1):
+        from_layer, to_layer = _PORT_METAL_CONVENTION[layernum]
+        port_defs.append(PortDef(
+            portnumber=portnumber,
+            source_layernum=layernum,
+            from_layername=from_layer,
+            to_layername=to_layer,
+        ))
+    return port_defs

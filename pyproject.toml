@@ -23,6 +23,19 @@ bench = ["pytest-benchmark>=4", "matplotlib>=3.8"]
 # PNG preview rendering (utils/preview.py) — the CLI's default output, `pip install -e ".[viz]"`.
 # Deliberately overlaps `bench`'s matplotlib pin rather than restructuring that extras group.
 viz = ["matplotlib>=3.8"]
+# openEMS SimulationBackend (sub-phase 1.4.1, characterization/openems/). openEMS/CSXCAD are
+# compiled FDTD-solver packages, not installable this way on every platform — this extra pins the
+# Python-side pieces; see characterization/openems/vendor/NOTICE for the vendored PDK helper
+# modules these wrap. Pinned to match the golden reference's own environment table exactly
+# (reference/python/TCoil_Dataset_Generator_and_Training.py:109,134) for 1.4.5's later
+# notebook-equivalence check. `gdspy` is required transitively by the vendored PDK GDS reader
+# (characterization/openems/vendor/modules/util_gds_reader.py) — a deliberate, narrowly-scoped
+# exception to the platform's own gdstk-over-gdspy choice (DEC-adopt-gdstk-as-the-l3-generator-
+# backend-0002): that ADR is about the L3 *generator* backend, this is vendored third-party PDK
+# code the openEMS solver plugin depends on, confined entirely to this optional extra. Deliberately
+# NOT added to `dev`, so CI (`pip install -e ".[dev]"`) stays green without a compiled FDTD solver —
+# see characterization/openems/tests/test_plugin.py's `pytest.importorskip` guard.
+sim = ["openEMS==0.0.36", "CSXCAD==0.6.2", "gdspy>=1.6", "numpy>=1.26"]
 
 [project.scripts]
 passivelab = "passivelab.cli:main"

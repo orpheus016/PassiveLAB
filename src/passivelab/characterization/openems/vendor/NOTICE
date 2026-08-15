@@ -1,0 +1,17 @@
+Vendored from IHP-GmbH/IHP-Open-PDK (https://github.com/IHP-GmbH/IHP-Open-PDK),
+ihp-sg13g2/libs.tech/openems/openems_ihp_sg13g2/workflow/{modules/,SG13G2.xml}.
+
+License: Apache License 2.0 (https://github.com/IHP-GmbH/IHP-Open-PDK/blob/main/LICENSE).
+Copyright IHP GmbH -- Leibniz-Institut fuer innovative Mikroelektronik.
+
+Local changes from upstream (PassiveLAB sub-phase 1.4.1):
+- modules/util_gds_reader.py, modules/util_meshlines.py, modules/util_simulation_setup.py:
+  converted intra-package `import util_x` statements to relative imports (`from . import util_x`)
+  so the modules work as a proper Python package under
+  `passivelab.characterization.openems.vendor.modules` instead of relying on being added to
+  `sys.path` individually.
+- modules/util_simulation_setup.py: `runSimulation()` gained an explicit `interactive_preview:
+  bool = False` parameter gating the AppCSXCAD GUI-preview launch, replacing the implicit
+  `if 1 in excite_portnumbers:` condition. Upstream code (and the golden notebook it was copied
+  from) relied on a one-line source edit to disable this for headless/batch runs; this vendored
+  copy makes that an explicit, tested parameter instead. No other behavioral changes.

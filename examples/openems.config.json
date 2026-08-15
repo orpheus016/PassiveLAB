@@ -1,0 +1,15 @@
+{
+  "solver": "openems",
+  "xml_path": "src/passivelab/characterization/openems/vendor/SG13G2.xml",
+  "num_cpus": 8,
+  "freq_start": 0,
+  "freq_stop": 100e9,
+  "numfreq": 1001,
+  "boundary_conditions": ["PEC", "PEC", "PEC", "PEC", "PEC", "PEC"],
+  "margin": 200,
+  "refined_cellsize": 1.0,
+  "cells_per_wavelength": 20,
+  "energy_limit_db": -50,
+  "merge_polygon_size": 1.5,
+  "preprocess_gds": true
+}
