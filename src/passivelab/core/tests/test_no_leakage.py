@@ -1,9 +1,11 @@
-"""No-leakage guard (sub-phase 1.2.2 validation bar).
+"""No-leakage guard (sub-phase 1.2.2 validation bar; extended 1.4.1 for solver plugins).
 
-``core/`` must have **zero references** to any passive device (``tcoil``) or geometry kit
-(``gdstk``): the platform contract stays PDK- and device-agnostic; devices attach as plugins that
-satisfy the Protocols. This test enforces that on the actual ``import`` statements of every
-non-test module under ``core/`` — so it can't silently rot into a claim in a doc.
+``core/`` must have **zero references** to any passive device (``tcoil``), geometry kit
+(``gdstk``), or solver kit (``openEMS``/``CSXCAD``/``gdspy``, the openEMS backend's own vendored
+GDS reader dependency): the platform contract stays PDK- and device- and solver-agnostic, devices
+and solvers attach as plugins that satisfy the Protocols. This test enforces that on the actual
+``import`` statements of every non-test module under ``core/`` — so it can't silently rot into a
+claim in a doc.
 
 Note we check imported *module names*, not any word: the docstrings deliberately *mention* tcoil /
 gdstk to explain intent, and that's fine — a dependency is an import, not a sentence.
@@ -23,19 +25,23 @@ def _core_source_files():
     return [p for p in CORE_DIR.rglob("*.py") if "tests" not in p.parts]
 
 
+_LEAK_MODULES = ("gdstk", "openEMS", "CSXCAD", "gdspy")
+_LEAK_PACKAGES = ("passivelab.geometry", "passivelab.characterization")
+
+
 def test_core_imports_no_device_or_geometry_kit():
     offenders: dict[str, list[str]] = {}
     for path in _core_source_files():
         for mod in _IMPORT_RE.findall(path.read_text(encoding="utf-8")):
             leaks = (
-                mod == "gdstk"
-                or mod.startswith("gdstk.")
-                or mod == "passivelab.geometry"          # the device implementations package
-                or mod.startswith("passivelab.geometry.")
+                mod in _LEAK_MODULES
+                or mod.startswith(tuple(f"{m}." for m in _LEAK_MODULES))
+                or mod in _LEAK_PACKAGES               # the device/solver implementation packages
+                or mod.startswith(tuple(f"{p}." for p in _LEAK_PACKAGES))
             )
             if leaks:
                 offenders.setdefault(path.name, []).append(mod)
-    assert not offenders, f"core/ must not import passive/geometry-kit modules: {offenders}"
+    assert not offenders, f"core/ must not import passive/geometry/solver-kit modules: {offenders}"
 
 
 def test_core_covers_every_core_source_file():
