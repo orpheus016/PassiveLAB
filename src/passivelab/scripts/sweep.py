@@ -61,11 +61,11 @@ def load_sweep_spec(path: str | pathlib.Path) -> SweepSpec:
 
 
 def run_sweep(specs: Sequence[TCoilSpec], out_dir: str | pathlib.Path, *, seed: int | None = None,
-              png: bool = True, max_renders: int = 12) -> dict:
+              png: bool = True) -> dict:
     """Validate+generate every spec in ``specs``, write ``out_dir/report.json`` (sample count,
-    TAP-exercised rate, rules.py-pass rate, per-sample entries), and GDS+PNG for one illustrative
-    sample per distinct ``(nseg, includepad)`` combo, up to ``max_renders``. Returns the report
-    dict.
+    TAP-exercised rate, rules.py-pass rate, per-sample entries), and a GDS+PNG per sample --
+    matching the golden notebook's own ``one_sample()`` dataset loop, which writes an image for
+    every index rather than thinning the set. Returns the report dict.
 
     Raises ``RuntimeError`` immediately on a foreign-layer polygon or a failed GDS round-trip --
     unlike the notebook-fidelity test this now backs, a real "generate my dataset" run should
@@ -88,7 +88,6 @@ def run_sweep(specs: Sequence[TCoilSpec], out_dir: str | pathlib.Path, *, seed: 
             render_png = None  # `viz`/`bench` extra not installed; report still gets written
 
     pdk_layer_datatypes = {(layer, 0) for layer in ALL_LAYERS}
-    rendered_combos: set[tuple[int, bool]] = set()
     results = []
     tap_exercised = 0
     rules_pass = 0
@@ -128,10 +127,7 @@ def run_sweep(specs: Sequence[TCoilSpec], out_dir: str | pathlib.Path, *, seed: 
             if tap_present:
                 tap_exercised += 1
 
-            combo = (spec.nseg, spec.includepad)
-            if (render_png is not None and combo not in rendered_combos
-                    and len(rendered_combos) < max_renders):
-                rendered_combos.add(combo)
+            if render_png is not None:
                 stem = out_dir / str(i)
                 lib = gdstk.Library()
                 lib.add(layout.cell)

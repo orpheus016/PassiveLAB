@@ -14,8 +14,7 @@ sweep-as-a-feature refactor promoted it out of this test into a real, reusable f
 test just calls it with the notebook-faithful sampler's output, keeping the identity that's
 actually specific to this file: it's the notebook-fidelity regression, not the report-writing
 mechanism. Writes `sweep_out/report.json` (sample count, TAP-exercised rate, rules.py-pass rate)
-and GDS+PNG for one illustrative case per distinct (nseg, includepad) combination encountered, for
-manual visual inspection -- not all N samples, to keep this fast and the output directory small.
+and a GDS+PNG per sample, for manual visual inspection.
 """
 from __future__ import annotations
 
@@ -27,14 +26,13 @@ from passivelab.scripts.sweep import run_sweep
 N_SAMPLES = 200
 SEED = 1337
 OUT_DIR = pathlib.Path(__file__).parent / "sweep_out"
-MAX_RENDERS = 12
 
 
 def test_sweep_matches_notebook_sampling_fidelity():
     OUT_DIR.mkdir(exist_ok=True)
 
     specs = list(sweep(N_SAMPLES, SEED))
-    report = run_sweep(specs, OUT_DIR, seed=SEED, max_renders=MAX_RENDERS)
+    report = run_sweep(specs, OUT_DIR, seed=SEED)
 
     print(f"\n[sweep] {N_SAMPLES} samples: "
           f"tap_exercised_rate={report['tap_exercised_rate']:.1%} "
