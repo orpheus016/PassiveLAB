@@ -14,7 +14,6 @@ import pytest
 
 pytest.importorskip("openEMS")
 pytest.importorskip("CSXCAD")
-pytest.importorskip("gdspy")
 
 import passivelab.geometry.tcoil  # noqa: E402 -- self-registers "tcoil"
 from passivelab.characterization.openems.config import OpenEMSConfig  # noqa: E402
