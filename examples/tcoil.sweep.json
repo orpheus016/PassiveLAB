@@ -1,6 +1,6 @@
 {
   "passive_type": "tcoil",
-  "n": 2,
+  "n": 8,
   "seed": 2237,
   "includepad": true,
   "pad_siz": 50

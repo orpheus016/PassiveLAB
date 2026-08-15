@@ -132,7 +132,7 @@ def run_sweep(specs: Sequence[TCoilSpec], out_dir: str | pathlib.Path, *, seed: 
             if (render_png is not None and combo not in rendered_combos
                     and len(rendered_combos) < max_renders):
                 rendered_combos.add(combo)
-                stem = out_dir / f"nseg{spec.nseg}_pad{spec.includepad}"
+                stem = out_dir / str(i)
                 lib = gdstk.Library()
                 lib.add(layout.cell)
                 lib.write_gds(str(stem.with_suffix(".gds")))
@@ -173,7 +173,7 @@ def run_sweep(specs: Sequence[TCoilSpec], out_dir: str | pathlib.Path, *, seed: 
 def sweep_command(spec_path: str | pathlib.Path, out_dir: str | pathlib.Path, *,
                    png: bool = True) -> pathlib.Path:
     """Load `spec_path`, generate `SweepSpec.n` notebook-faithful tcoil samples, run them through
-    `run_sweep()`, and return the written `out_dir/report.json` path."""
+    `run_sweep()`, and return the written `out_dir/sweep/<passive_type>/report.json` path."""
     sweep_spec = load_sweep_spec(spec_path)
     if sweep_spec.passive_type != "tcoil":
         raise ValueError(
@@ -181,5 +181,6 @@ def sweep_command(spec_path: str | pathlib.Path, out_dir: str | pathlib.Path, *,
         )
     specs = list(tcoil_sweep(sweep_spec.n, sweep_spec.seed,
                               includepad=sweep_spec.includepad, pad_siz=sweep_spec.pad_siz))
-    run_sweep(specs, out_dir, seed=sweep_spec.seed, png=png)
-    return pathlib.Path(out_dir) / "report.json"
+    sweep_out_dir = pathlib.Path(out_dir) / "sweep" / sweep_spec.passive_type
+    run_sweep(specs, sweep_out_dir, seed=sweep_spec.seed, png=png)
+    return sweep_out_dir / "report.json"
