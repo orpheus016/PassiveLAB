@@ -130,8 +130,14 @@ unrelated top-level dirs keyed by a bare integer index (`SPData/`, `EMLOG/`, `PN
                                # wall-clock time, success/failure + error, post-processed Metrics
                                # summary (1.4.4) — everything a future webapp or 1.5.2's
                                # DatasetPipeline needs without bespoke parsing. Renamed from
-                               # manifest.json (1.4.4) — the only per-sample output file here.
+                               # manifest.json (1.4.4) — the only file `OpenEMSBackend` itself
+                               # writes here; the CLI layer's `simulate --plot` optionally adds
+                               # metrics.json/sparams.html alongside it (see that section, below).
 ```
+
+This is `OpenEMSBackend`'s own `out_dir` (passed in at construction by whoever calls it — the CLI
+wrapper points it at `<cli-out-dir>/simulate/single/<passive_type>/<solver>/`, see "Output folder
+layout" in the README for the full tree including `generate`'s).
 
 `OpenEMSBackend(config, out_dir)` takes `out_dir` at construction (one instance = one output root);
 `sample_id` is derived deterministically inside `simulate()` from `layout.parameter_manifest` (a
@@ -281,12 +287,13 @@ solver-config.json --out-dir out --plot`) is deliberately **not** a new command 
 skip-if-unchanged caching), so "post-process what's already there" and "solve, then post-process"
 collapse into the same code path here.
 
-- `_write_characterize_output()` reconstructs `PortDef`s from `result.raw["ports"]`, calls
+- `_write_plot_output()` reconstructs `PortDef`s from `result.raw["ports"]`, calls
   `sparams_to_metrics()` for the **full** `Metrics` (the complete `(numfreq, n, n)` matrix — not
   `metrics_summary_for_report()`'s lightweight subset already embedded in `simulate`'s own
-  `report.json`), and writes two files under
-  `<out-dir>/characterize/<passive_type>/<solver>/<sample_id>/`:
-  - `report.json` — `sparams.metrics_to_full_json()`: the complete `Metrics`, JSON-serialized
+  `report.json`), and writes two files straight into `result.raw["sim_dir"]` — the backend's own
+  already-absolute per-sample directory, alongside the `.s3p`/`.gds`/`report.json`/`sub-N/` it
+  already wrote, **not** a separate output tree:
+  - `metrics.json` — `sparams.metrics_to_full_json()`: the complete `Metrics`, JSON-serialized
     (complex `s_parameters`/`frequency_hz` split into `{"real": [...], "imag": [...]}`). This *is*
     the on-demand deep-dive artifact (one sample at a time, not the per-dataset-row path 1.5.2 will
     run at scale), so the bloat `metrics_summary_for_report()` deliberately avoids is an accepted
@@ -296,8 +303,14 @@ collapse into the same code path here.
     `S_ij` magnitude (dB) and phase (deg) vs. frequency, zoomable/hoverable. New dependency:
     `plotly`, added to the existing `viz` extra alongside `matplotlib` — deferred-imported (like
     `utils/preview.py`'s matplotlib import) so importing `viz.py` never requires it.
-- `simulate_command()`'s own `report.json` gains one field when `--plot` is used:
-  `characterize_report_path`, pointing at the file above.
+- `simulate_command()`'s own CLI-level `report.json` gains one field when `--plot` is used:
+  `metrics_path`, pointing at the file above.
+- **Output folder shape** (revised from this section's first pass, per direct feedback): every
+  command writes under `<out-dir>/<api>/<single|sweep>/<passive_type>/[<solver>/]...` — top level
+  is which command produced it, then whether it's one sample or a batch, then the passive type,
+  then the solver. `simulate` always writes under `simulate/single/` today; `generate --sweep`
+  writes under `generate/sweep/`; 1.5.2's future Ray-distributed batch runs would use
+  `simulate/sweep/`. See the README's "Output folder layout" section for the full tree.
 
 **Bug found and fixed alongside this (live-testing discovery)**: `simulate_command()` used to keep
 `out_dir` as whatever string/relative path the caller passed. openEMS's compiled `Run()` leaves the
@@ -309,17 +322,16 @@ resolving `out_dir` to absolute at the top of `simulate_command()`, matching how
 stub backend + `monkeypatch.chdir()` (`tests/test_simulate_cli.py`) since reproducing the real cwd
 change needs an actual openEMS install.
 
-**Live verification (2026-08-16)**: ran `simulate --plot` end-to-end against the real local
-openEMS install (reduced/fast config). Both `out/characterize/tcoil/openems/<sample_id>/
-report.json` and `sparams.html` landed at the correct, non-nested path (confirming the cwd-bug fix
-above actually works, not just in the stub regression test). `report.json`: `port_numbers ==
-[1, 2, 3]`, `s_parameters` real/imag each `(101, 3, 3)`, `training_vector` length 1818 — the full
-matrix this time, unlike `simulate`'s own lightweight summary. `sparams.html`: 4.9 MB
-(plotly embedded inline, no CDN/server needed), contains all nine `S11`..`S33` trace labels and a
-real `Plotly.newPlot(...)` call. The CLI-level `report.json` one directory up carries `characterize_report_path` pointing at the
-exact file above. This was a fresh `out-dir` (no prior hash-cached data to skip), so this run did
-a genuine solve; `--plot`'s own contribution is reading the `.s3p` that same `simulate` call just
-produced -- no second solve, no separate command.
+**Live verification (2026-08-16, re-run after the nesting/folder-layout revision)**: ran
+`simulate --plot` end-to-end against the real local openEMS install (reduced/fast config), writing
+directly into this repo's own `out/` (not a scratch directory, so the output persists for
+inspection). `out/simulate/single/tcoil/openems/<sample_id>/metrics.json` and `sparams.html`
+landed inside the same per-sample directory as `<sample_id>.s3p`/`<sample_id>.gds`/`report.json`/
+`sub-N/` — no separate tree. `metrics.json`: `port_numbers == [1, 2, 3]`, `s_parameters` real/imag
+each `(101, 3, 3)`, `training_vector` length 1818. `sparams.html`: self-contained (plotly embedded
+inline), contains all nine `S11`..`S33` trace labels and a real `Plotly.newPlot(...)` call. The
+CLI-level `report.json` (`out/simulate/single/tcoil/openems/report.json`) carries `metrics_path`
+pointing at the exact file above.
 
 ## CLI: `passivelab simulate` (sub-phase 1.4.9)
 

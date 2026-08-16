@@ -69,9 +69,10 @@ passivelab generate examples/tcoil.spec.json --out-dir out
 
 loads the spec, calls `spec.validate()` (parameter-range checks only — DRC is separate,
 out of scope), dispatches to the right plugin via `generate(spec)`, and writes
-`<out-dir>/<cell_name>/<cell_name>.gds` (+ `.png` unless `--no-png`). The written GDS's layers are
-checked against the plugin's real PDK layer set before it ever reaches you — a malformed spec or
-an unknown `passive_type` fails with one line (`error: ...`), not a traceback.
+`<out-dir>/generate/single/<passive_type>/<cell_name>.gds` (+ `.png` unless `--no-png`). The
+written GDS's layers are checked against the plugin's real PDK layer set before it ever reaches
+you — a malformed spec or an unknown `passive_type` fails with one line (`error: ...`), not a
+traceback.
 
 ## Sweeping parameters
 
@@ -82,7 +83,8 @@ passivelab sweep examples/tcoil.sweep.json --out-dir out
 Generates an N-sample sweep from a sweep-spec.json (`n`/`seed` + the two fields the notebook's
 sampler otherwise hardcodes, `includepad`/`pad_siz`) — every randomized geometry field is sampled
 the same way the golden notebook itself samples them, not an arbitrary grid (see
-`src/passivelab/geometry/tcoil/sampling.py`). Writes `out/report.json` plus a GDS+PNG per distinct
+`src/passivelab/geometry/tcoil/sampling.py`). Writes
+`<out-dir>/generate/sweep/<passive_type>/report.json` plus a GDS+PNG per distinct
 `(nseg, includepad)` case for a quick look.
 
 The same mechanism backs a notebook-fidelity regression test, run on demand:
@@ -104,11 +106,12 @@ passivelab simulate examples/tcoil.spec.json examples/openems.config.json --out-
 Same "state it declaratively" shape as `generate`/`sweep`, one layer up: `spec.json` describes the
 device, `openems.config.json` (or any other registered solver's own config — the `"solver"` field
 picks the backend, the command itself never hardcodes one) describes the solver run. Generates the
-`Layout`, runs it through the named `SimulationBackend`, and writes `<out-dir>/simulate/
-<passive_type>/<solver>/report.json` pointing at the backend's own per-sample `report.json`/
-`.s3p` (see `docs/OPENEMS_BACKEND.md`'s output-folder design) — the report doesn't duplicate the
-full S-parameter matrix, just links to it (a small post-processed summary does ride along — see
-`docs/OPENEMS_BACKEND.md`'s "S-parameter post-processing" section, 1.4.4).
+`Layout`, runs it through the named `SimulationBackend`, and writes
+`<out-dir>/simulate/single/<passive_type>/<solver>/report.json` pointing at the backend's own
+per-sample `report.json`/`.s3p` (see `docs/OPENEMS_BACKEND.md`'s output-folder design) — the
+report doesn't duplicate the full S-parameter matrix, just links to it (a small post-processed
+summary does ride along — see `docs/OPENEMS_BACKEND.md`'s "S-parameter post-processing" section,
+1.4.4).
 
 Needs the solver's own extra installed to actually run (e.g. `pip install -e ".[sim]"` for
 openems, plus a real openEMS/CSXCAD install — see `characterization/openems/vendor/NOTICE`);
@@ -116,11 +119,13 @@ without it, `simulate` fails with a clear `error: ...` naming the missing extra,
 `generate --no-png`'s matplotlib check.
 
 Single `spec.json` only for now — a `sweep-spec.json` (many samples through the same solver run)
-is a documented future enhancement, not built here (board task 1.4.9).
+is a documented future enhancement, not built here (board task 1.4.9; would write under
+`simulate/sweep/` rather than `simulate/single/`, see "Output folder layout" below).
 
 Add `--plot` to also write the *full* `Metrics` (not the lightweight summary above) and an
-interactive (zoomable/hoverable) S-parameter magnitude/phase HTML plot to
-`<out-dir>/characterize/<passive_type>/<solver>/<sample_id>/`:
+interactive (zoomable/hoverable) S-parameter magnitude/phase HTML plot straight into that same
+per-sample directory (`metrics.json` + `sparams.html`, alongside the `.s3p`/`.gds`/`report.json`
+already there):
 
 ```bash
 passivelab simulate examples/tcoil.spec.json examples/openems.config.json --out-dir out --plot
@@ -130,3 +135,26 @@ Not a separate command — re-running `simulate` on an unchanged spec/config is 
 vendored solver's own hash-based skip-if-unchanged caching), so `--plot` on its own effectively
 means "post-process what's already there." Needs the `viz` extra (`pip install -e ".[viz]"`) for
 `plotly`.
+
+## Output folder layout
+
+Every command writes under `<out-dir>/<api>/<single|sweep>/<passive_type>/[<solver>/]...` — top
+level is *which command produced it* (`generate`, `simulate`, future `optimize`/`evaluate`), then
+whether it's one sample or a batch, then the passive type, then (only where relevant) the solver:
+
+```
+out/
+  generate/
+    single/tcoil/<cell_name>.gds(+.png)
+    sweep/tcoil/{0..N}.gds(+.png) + report.json
+  simulate/
+    single/tcoil/openems/report.json                      # CLI-level, points at the sample below
+    single/tcoil/openems/<sample_id>/                      # the backend's own per-sample output
+      <sample_id>.gds, <sample_id>.s3p, report.json
+      metrics.json, sparams.html                           # only with --plot
+      sub-1/, sub-2/, sub-3/                                # per-excitation raw data + logs
+```
+
+`generate --sweep` and `simulate` batch runs (1.5.2's future Ray-distributed dataset generation)
+both live under their command's `sweep/` rather than `single/` — the split is orthogonal to which
+command ran, not a separate command of its own.
