@@ -81,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("solver_config_path", help="path to a solver-config.json (e.g. openems.config.json)")
     sim.add_argument("--out-dir", default=paths.DEFAULT_OUT_DIR,
                       help=f"output directory (default: {paths.DEFAULT_OUT_DIR})")
+    sim.add_argument("--plot", action="store_true",
+                      help="also write the full Metrics + an interactive S-parameter plot under "
+                           "out-dir/characterize/... (needs the viz extra)")
 
     args = parser.parse_args(argv)
 
@@ -90,13 +93,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "sweep":
             result_path = sweep_command(args.spec_path, args.out_dir, png=not args.no_png)
         else:  # "simulate"
-            result_path = simulate_command(args.spec_path, args.solver_config_path, args.out_dir)
+            result_path = simulate_command(args.spec_path, args.solver_config_path, args.out_dir,
+                                            plot=args.plot)
     except (ValueError, KeyError, TypeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     except ImportError as e:
-        print(f"error: {e} (PNG preview needs matplotlib: pip install -e \".[viz]\"; a solver "
-              f"needs its own extra, e.g. pip install -e \".[sim]\" for openems)", file=sys.stderr)
+        print(f"error: {e} (PNG preview and --plot need matplotlib/plotly: "
+              f"pip install -e \".[viz]\"; a solver needs its own extra, e.g. "
+              f"pip install -e \".[sim]\" for openems)", file=sys.stderr)
         return 1
 
     print(result_path)

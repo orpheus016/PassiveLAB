@@ -273,6 +273,54 @@ file — `manifest.json` no longer exists anywhere. Its `metrics` key carries ex
 `training_vector` length **1818** and `training_frequency_hz` length **101** — matching the golden
 reference's own numbers exactly — and no `s_parameters`/`frequency_hz` (the full matrix stays out).
 
+## `simulate --plot`: full Metrics + interactive S-parameter plot
+
+`scripts/simulate.py`'s `simulate_command(..., plot=True)` (CLI: `passivelab simulate spec.json
+solver-config.json --out-dir out --plot`) is deliberately **not** a new command — re-running
+`simulate` on an unchanged spec/config is already cheap (the vendored solver's own hash-based
+skip-if-unchanged caching), so "post-process what's already there" and "solve, then post-process"
+collapse into the same code path here.
+
+- `_write_characterize_output()` reconstructs `PortDef`s from `result.raw["ports"]`, calls
+  `sparams_to_metrics()` for the **full** `Metrics` (the complete `(numfreq, n, n)` matrix — not
+  `metrics_summary_for_report()`'s lightweight subset already embedded in `simulate`'s own
+  `report.json`), and writes two files under
+  `<out-dir>/characterize/<passive_type>/<solver>/<sample_id>/`:
+  - `report.json` — `sparams.metrics_to_full_json()`: the complete `Metrics`, JSON-serialized
+    (complex `s_parameters`/`frequency_hz` split into `{"real": [...], "imag": [...]}`). This *is*
+    the on-demand deep-dive artifact (one sample at a time, not the per-dataset-row path 1.5.2 will
+    run at scale), so the bloat `metrics_summary_for_report()` deliberately avoids is an accepted
+    tradeoff here, not an oversight.
+  - `sparams.html` — `characterization/openems/viz.py`'s `plot_sparams_interactive()`: a
+    self-contained (plotly embedded inline, opens offline, no server) interactive plot of every
+    `S_ij` magnitude (dB) and phase (deg) vs. frequency, zoomable/hoverable. New dependency:
+    `plotly`, added to the existing `viz` extra alongside `matplotlib` — deferred-imported (like
+    `utils/preview.py`'s matplotlib import) so importing `viz.py` never requires it.
+- `simulate_command()`'s own `report.json` gains one field when `--plot` is used:
+  `characterize_report_path`, pointing at the file above.
+
+**Bug found and fixed alongside this (live-testing discovery)**: `simulate_command()` used to keep
+`out_dir` as whatever string/relative path the caller passed. openEMS's compiled `Run()` leaves the
+process's working directory inside the *last* excitation's `sub-N/` folder afterward (confirmed
+live — a relative `--out-dir out` run's final `report.json` landed nested at
+`out/simulate/.../sub-3/out/simulate/.../report.json` instead of the intended path). Fixed by
+resolving `out_dir` to absolute at the top of `simulate_command()`, matching how
+`OpenEMSBackend.simulate()` already handles its own `sim_dir` internally. Regression-tested with a
+stub backend + `monkeypatch.chdir()` (`tests/test_simulate_cli.py`) since reproducing the real cwd
+change needs an actual openEMS install.
+
+**Live verification (2026-08-16)**: ran `simulate --plot` end-to-end against the real local
+openEMS install (reduced/fast config). Both `out/characterize/tcoil/openems/<sample_id>/
+report.json` and `sparams.html` landed at the correct, non-nested path (confirming the cwd-bug fix
+above actually works, not just in the stub regression test). `report.json`: `port_numbers ==
+[1, 2, 3]`, `s_parameters` real/imag each `(101, 3, 3)`, `training_vector` length 1818 — the full
+matrix this time, unlike `simulate`'s own lightweight summary. `sparams.html`: 4.9 MB
+(plotly embedded inline, no CDN/server needed), contains all nine `S11`..`S33` trace labels and a
+real `Plotly.newPlot(...)` call. The CLI-level `report.json` one directory up carries `characterize_report_path` pointing at the
+exact file above. This was a fresh `out-dir` (no prior hash-cached data to skip), so this run did
+a genuine solve; `--plot`'s own contribution is reading the `.s3p` that same `simulate` call just
+produced -- no second solve, no separate command.
+
 ## CLI: `passivelab simulate` (sub-phase 1.4.9)
 
 `scripts/simulate.py`'s `simulate_command()` (+ `passivelab simulate spec.json solver-config.json

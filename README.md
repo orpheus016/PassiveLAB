@@ -117,3 +117,16 @@ without it, `simulate` fails with a clear `error: ...` naming the missing extra,
 
 Single `spec.json` only for now — a `sweep-spec.json` (many samples through the same solver run)
 is a documented future enhancement, not built here (board task 1.4.9).
+
+Add `--plot` to also write the *full* `Metrics` (not the lightweight summary above) and an
+interactive (zoomable/hoverable) S-parameter magnitude/phase HTML plot to
+`<out-dir>/characterize/<passive_type>/<solver>/<sample_id>/`:
+
+```bash
+passivelab simulate examples/tcoil.spec.json examples/openems.config.json --out-dir out --plot
+```
+
+Not a separate command — re-running `simulate` on an unchanged spec/config is already cheap (the
+vendored solver's own hash-based skip-if-unchanged caching), so `--plot` on its own effectively
+means "post-process what's already there." Needs the `viz` extra (`pip install -e ".[viz]"`) for
+`plotly`.

@@ -116,6 +116,27 @@ def sparams_to_metrics(s3p_path: str | pathlib.Path, port_defs: list["PortDef"])
     })
 
 
+def metrics_to_full_json(metrics: Metrics) -> dict:
+    """The complete, JSON-serializable form of ``sparams_to_metrics()``'s output -- unlike
+    :func:`metrics_summary_for_report`, this keeps the full raw ``frequency_hz``/``s_parameters``
+    (complex, not directly JSON-serializable, so split into ``{"real": [...], "imag": [...]}``).
+    For the on-demand ``simulate --plot`` output (one sample at a time, not the per-dataset-row
+    path 1.5.2 will run at scale), so the bloat ``metrics_summary_for_report()`` deliberately avoids
+    is an acceptable, deliberate tradeoff here -- this *is* the deep-dive artifact.
+    """
+    v = metrics.values
+    s = np.asarray(v["s_parameters"])
+    return {
+        "s3p_path": v["s3p_path"],
+        "port_numbers": list(v["port_numbers"]),
+        "s_parameters_convention": v["s_parameters_convention"],
+        "frequency_hz": np.asarray(v["frequency_hz"]).tolist(),
+        "s_parameters": {"real": s.real.tolist(), "imag": s.imag.tolist()},
+        "training_frequency_hz": np.asarray(v["training_frequency_hz"]).tolist(),
+        "training_vector": np.asarray(v["training_vector"]).tolist(),
+    }
+
+
 def metrics_summary_for_report(metrics: Metrics) -> dict:
     """The lightweight, JSON-serializable subset of ``sparams_to_metrics()``'s output for
     embedding directly in the per-sample ``report.json`` (1.4.4) -- deliberately excludes
