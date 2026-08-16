@@ -280,7 +280,7 @@ def setupSimulation (excite_portnumbers,simulation_ports, FDTD, materials_list, 
     return FDTD
 
 
-def runSimulation (excite_portnumbers, FDTD, sim_path, model_basename, preview_only, postprocess_only, force_simulation=False, interactive_preview=False):
+def runSimulation (excite_portnumbers, FDTD, sim_path, model_basename, preview_only, postprocess_only, force_simulation=False, interactive_preview=False, num_threads=None, verbose=None, dump_statistics=False):
 
     excitation_path = utilities.get_excitation_path (sim_path, excite_portnumbers)
 
@@ -315,7 +315,23 @@ def runSimulation (excite_portnumbers, FDTD, sim_path, model_basename, preview_o
             print('Starting FDTD simulation for excitation ', str(excite_portnumbers))
             try:
 
-                FDTD.Run(excitation_path)  # DO NOT SPECIFY COMMAND LINE OPTIONS HERE! That will fail for repeated runs with multiple excitations.
+                # PassiveLAB 1.4.3: the upstream comment here said "DO NOT SPECIFY COMMAND LINE
+                # OPTIONS HERE! That will fail for repeated runs with multiple excitations." That
+                # warning stands for arbitrary/ad-hoc CLI flags; num_threads/verbose/dump_statistics
+                # below are real, narrow, openEMS-documented Run() kwargs (not invented flags), and
+                # each excitation in this backend's caller (plugin.py's port loop) already builds a
+                # brand-new FDTD instance via setupSimulation() before calling here -- there is no
+                # state carried between Run() calls for these options to corrupt. Confirmed safe by
+                # live multi-port runs (1.4.3 PR). Omitted kwargs (None/False) reproduce the exact
+                # prior call with zero options, so any other caller is unaffected.
+                run_kwargs = {}
+                if num_threads is not None:
+                    run_kwargs['numThreads'] = num_threads
+                if verbose is not None:
+                    run_kwargs['verbose'] = verbose
+                if dump_statistics:
+                    run_kwargs['dump_statistics'] = True
+                FDTD.Run(excitation_path, **run_kwargs)
                 print('FDTD simulation completed successfully for excitation ', str(excite_portnumbers))
                 # Now that simulation created output data, write the hash of the underlying XML model. This will help to identify existing data for this model.
                 write_hash_to_data_folder(excitation_path, XML_hash)

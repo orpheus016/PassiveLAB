@@ -47,6 +47,17 @@ class OpenEMSConfig:
     energy_limit_db: float = -50.0
     merge_polygon_size: float = 1.5
     preprocess_gds: bool = True
+    #: openEMS install directory (contains CSXCAD_MSVC.dll etc.) -- passed to
+    #: os.add_dll_directory() before the deferred CSXCAD/openEMS imports (1.4.3). None skips the
+    #: call (non-Windows, or the DLLs are already resolvable). Machine-specific -- not baked into
+    #: the checked-in examples/openems.config.json.
+    install_path: str | None = None
+    #: openEMS verbosity 0-3, forwarded to FDTD.Run(verbose=...). Default 3 (not 0): a real ~72
+    #: minute run with no verbosity looked identical to a hang (1.4.3's whole reason for existing).
+    verbose: int = 3
+    #: forwarded to FDTD.Run(dump_statistics=...) -- writes openEMS_run_stats.txt/openEMS_stats.txt
+    #: per excitation, alongside the openems_run.log this sub-phase also captures.
+    dump_statistics: bool = True
 
 
 def load_openems_config(path: str | pathlib.Path) -> OpenEMSConfig:

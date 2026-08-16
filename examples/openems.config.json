@@ -11,5 +11,7 @@
   "cells_per_wavelength": 20,
   "energy_limit_db": -50,
   "merge_polygon_size": 1.5,
-  "preprocess_gds": true
+  "preprocess_gds": true,
+  "verbose": 3,
+  "dump_statistics": true
 }

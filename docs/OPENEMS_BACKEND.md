@@ -161,18 +161,66 @@ frequency points, max 0.998, zero violations. Total wall-clock ~72 minutes (port
 by one small mesh cell (`Smallest timestep... found at position: 2:126;52;27`), not a threading
 problem (openEMS auto-benchmarked 1-4 threads and picked 3 as fastest on its own).
 
-Three real gaps found, **not yet fixed here** — tracked as board tasks, not silently left as prose:
+Three real gaps found — the first three are now fixed (board task **1.4.3**, see the section
+below); the fourth is still open:
 
-- **No install-path handling** — `CSXCAD` fails with an opaque `DLL load failed` on Windows unless
-  `os.add_dll_directory(<install dir>)` runs before the import; nothing in this package does that
-  today. → board task **1.4.3**.
-- **`num_cpus` still not wired** — confirmed via the real `openEMS.Run()` signature
-  (`numThreads (int) -- default 0 --> max`) that it always defaults to "max," harmless solo but a
-  real oversubscription risk once 1.5.2's concurrent Ray workers each grab all cores. → **1.4.3**.
-- **Runs silently by default** — no `verbose`/`dump_statistics` passed to `Run()`; the ~72-minute
-  run above looked identical to a hang until a diagnostic script added them manually. → **1.4.3**.
+- ~~No install-path handling~~ — fixed: `OpenEMSConfig.install_path` (1.4.3).
+- ~~`num_cpus` still not wired~~ — fixed: forwarded to `FDTD.Run(numThreads=...)` (1.4.3).
+- ~~Runs silently by default~~ — fixed: `verbose`/`dump_statistics` config fields, plus a captured
+  `openems_run.log` per excitation (1.4.3).
 - The femtosecond-timestep root cause itself (real geometry constraint vs. a mesh-config artifact)
   is unexplored — → board task **1.4.7**.
+
+## Install path, num_cpus, non-silent execution (sub-phase 1.4.3)
+
+`OpenEMSConfig` gained three fields, all JSON-config-driven (`examples/openems.config.json`), not
+environment variables:
+
+- **`install_path: str | None`** — the openEMS install directory (contains `CSXCAD_MSVC.dll` etc.).
+  `plugin.py`'s `_simulate()` calls `os.add_dll_directory(config.install_path)` before *any*
+  deferred import (not just the later `from openEMS import openEMS` — `util_simulation_setup`
+  imports `CSXCAD` at its own module level, so the DLL resolution failure actually happens there
+  first). `None` (the default) skips the call — non-Windows, or DLLs already resolvable via `PATH`.
+  Machine-specific, so it's intentionally **not** set in the checked-in example config; a caller on
+  Windows needs to point it at their own install (e.g. `C:\opt\openEMS\openEMS`). On import failure
+  with `install_path` unset, the error message now names the field instead of surfacing the raw
+  opaque `DLL load failed`.
+- **`num_cpus`** now actually reaches the solver: forwarded through `runSimulation()`'s new
+  `num_threads` parameter to `FDTD.Run(numThreads=config.num_cpus, ...)`.
+- **`verbose: int` (0-3, default 3)** and **`dump_statistics: bool` (default True)** are forwarded
+  the same way. `verbose` makes openEMS's compiled core actually print progress; `dump_statistics`
+  makes it write `openEMS_run_stats.txt` (time-series: time/timestep/speed/energy) and
+  `openEMS_stats.txt` (final summary) directly into the excitation folder.
+- **The console text itself is captured**, not just enabled: `FDTD.Run()` is a compiled extension
+  writing straight to the process's real stdout/stderr file descriptors, so a Python-level
+  `sys.stdout` reassignment wouldn't see it. `plugin.py`'s `_redirect_to_log()` duplicates fds 1/2
+  to `<sim_dir>/sub-N/openems_run.log` for the duration of each port's `runSimulation()` call —
+  mirroring the golden reference's own `os.system(f"... > {index}.log")` shell redirect, scoped per
+  port excitation (this backend runs in-process, one Python process per sample, not one
+  subprocess-per-sample like the reference).
+- `SimulationResult.raw["logs"]` echoes all three paths per port (`log`/`run_stats`/`stats`), so a
+  caller checking "is this simulation working properly or producing wrong results" reads a file
+  instead of re-deriving the `sub-N/` folder convention or re-running with verbosity turned on
+  after the fact.
+
+**The vendored `runSimulation()`'s "DO NOT SPECIFY COMMAND LINE OPTIONS" warning.** The upstream
+comment above `FDTD.Run(excitation_path)` warns against exactly this kind of kwarg-passing. Read as
+guarding against arbitrary/ad-hoc CLI flags rather than the narrow, openEMS-documented
+`numThreads`/`verbose`/`dump_statistics` kwargs added here — and this backend's caller (`plugin.py`'s
+per-port loop) already builds a brand-new `FDTD` instance per excitation via `setupSimulation()`, so
+there's no cross-call state for these options to corrupt. Confirmed by a live multi-port smoke run
+(below), not dismissed on reasoning alone. See `vendor/NOTICE` for the recorded deviation.
+
+**Live smoke verification (2026-08-16)**: ran end-to-end against the real local openEMS install
+(`C:\opt\openEMS\openEMS`) with a deliberately coarse/fast config (`num_cpus=2`, `numfreq=11`,
+`cells_per_wavelength=5`, `energy_limit_db=-15` — a mechanism check, not an accuracy run; that's
+1.4.7/1.4.8's job) on the baseline T-coil (131k mesh cells, 3 ports). Result: `success=True`,
+end-to-end in ~52 seconds. DLL resolved via `install_path` with no manual workaround. All three
+ports' `openems_run.log` were non-empty (~17 KB each) and contained
+`Multithreaded engine using 2 threads. Utilization: (31;31)` — matching `config.num_cpus=2` exactly.
+`openEMS_run_stats.txt`/`openEMS_stats.txt` existed for every port. All three ports' `Run()` calls
+completed with no error — directly exercising, and clearing, the vendored warning's
+multi-excitation concern.
 
 `write_snp()`'s 1-port code path (indexes `Smatrix[0, index]` for a `(1, numfreq)`-shaped input,
 never exercised since T-coil's PAD/CIR ports are unconditional — a minimum of 2 ports always)
