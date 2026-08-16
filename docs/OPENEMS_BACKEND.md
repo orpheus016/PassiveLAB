@@ -126,9 +126,11 @@ unrelated top-level dirs keyed by a bare integer index (`SPData/`, `EMLOG/`, `PN
   <sample_id>.xml           # CSX (per excitation, via the vendored setupSimulation)
   sub-1/, sub-2/, ...       # raw FDTD data per port excitation (vendored get_excitation_path layout)
   <sample_id>.s{n}p          # Touchstone S-parameters (n = number of ports actually present)
-  manifest.json               # sample_id, solver, config used, port definitions, solver versions,
-                               # wall-clock time, success/failure + error — everything a future
-                               # webapp or 1.5.2's DatasetPipeline needs without bespoke parsing
+  report.json                 # sample_id, solver, config used, port definitions, solver versions,
+                               # wall-clock time, success/failure + error, post-processed Metrics
+                               # summary (1.4.4) — everything a future webapp or 1.5.2's
+                               # DatasetPipeline needs without bespoke parsing. Renamed from
+                               # manifest.json (1.4.4) — the only per-sample output file here.
 ```
 
 `OpenEMSBackend(config, out_dir)` takes `out_dir` at construction (one instance = one output root);
@@ -139,11 +141,12 @@ never collide (each owns its own subfolder — a 1.5.2 Ray-fan-out invariant, un
 and re-running the *same* sample naturally reuses its path and gets the vendored hash-based
 skip-if-unchanged behavior as real caching across separate runs, not just retries within one.
 
-`SimulationResult.raw` points to the `.s3p`/manifest rather than duplicating the full `(n, n,
+`SimulationResult.raw` points to the `.s3p`/`report.json` rather than duplicating the full `(n, n,
 numfreq)` S-parameter matrix as JSON — the Touchstone file is the canonical artifact (matches how
 the golden reference's own dataset loader reads results back off disk), and embedding the full
-matrix in every sample's manifest would bloat it for no reader not already better served by
-re-reading the `.s3p` file.
+matrix in every sample's report would bloat it for no reader not already better served by
+re-reading the `.s3p` file. `report.json` does carry a much smaller post-processed summary (1.4.4,
+see below) — real derived output, not just a pointer.
 
 Other scalability constraints upheld (see `plugin.py`'s module docstring): no `os.chdir()` (every
 path is absolute), no mutable instance/live-solver state between `simulate()` calls.
@@ -225,6 +228,50 @@ multi-excitation concern.
 `write_snp()`'s 1-port code path (indexes `Smatrix[0, index]` for a `(1, numfreq)`-shaped input,
 never exercised since T-coil's PAD/CIR ports are unconditional — a minimum of 2 ports always)
 remains untested, flagged for whoever adds a genuinely single-port passive later.
+
+## S-parameter post-processing to Metrics (sub-phase 1.4.4)
+
+`characterization/openems/sparams.py` turns the `.s3p` `write_snp()` already writes into a
+`core.types.Metrics` — via `skrf.Network`, the same library the golden reference itself uses for
+every S3P read (`load_sparameters()`, `GetPredictedNetwork()`, 1.7's ngspice transcription). New
+base dependency: `scikit-rf` (pure Python + numpy, no compiled solver — not gated behind `sim`).
+
+- `sparams_to_metrics(s3p_path, port_defs) -> Metrics` reads the file, asserts the port count
+  matches `port_defs` (raising `ValueError` on mismatch — "port ordering explicit and asserted, not
+  incidental"), and returns the full raw `(numfreq, n, n)` S-matrix plus a **training-target
+  vector**: a byte-for-byte replica of the golden reference's `load_sparameters()` decimation
+  (`range(0, 1001, 10)` → 101 points, 0-100 GHz at 1 GHz step) and flatten (`s[k].flatten()` →
+  `concatenate(real, imag)` per frequency, concatenated across frequencies) — 1818-dim for the
+  3-port case, matching the reference exactly.
+- **Port-ordering convention (tested, not assumed)**: `skrf.Network(...).s[k]`'s row axis turns out
+  to be the *excitation* (source) port and column axis the *response* port for this repo's
+  `write_snp()` (vendored, column-grouped-by-source Touchstone writer) + `skrf` reader combination —
+  the reverse of what "S_ij = response i / source j" notation alone would suggest. Confirmed
+  empirically with asymmetric synthetic S-values (a real reciprocal T-coil's S-matrix is nearly
+  symmetric, which would hide a row/column mixup) — see `test_sparams.py`'s convention-regression
+  test. **Not "corrected" here**: the golden reference's own `load_sparameters()` consumes `ntwk.s`
+  the same un-transposed way, so normalizing it in this repo would make our S-parameters diverge
+  from what the notebook itself produces, breaking 1.4.5/1.4.8's bit-for-bit equivalence checks.
+- `metrics_summary_for_report(metrics) -> dict` is the lightweight, JSON-serializable subset that
+  rides into `report.json` automatically (see `plugin.py`'s `_simulate()`): `s3p_path`,
+  `port_numbers`, the convention note, and the small decimated `training_vector`/
+  `training_frequency_hz` — deliberately **excluding** the full raw matrix, for the same
+  no-duplication reasoning `s3p_path` already gets. `scripts/simulate.py`'s separate, one-level-up
+  `report.json` (per CLI invocation) also picks up this summary via `result.raw.get("metrics")`.
+- No derived physical quantities (L/Q/R) are computed — the golden reference's own dataset/training
+  pipeline never computes any either; the only thing 1.6 trains against is the decimated S-parameter
+  vector itself.
+- Out of scope: the generic `core.characterize(layout) -> Metrics` entry point from `GOAL.md`
+  (single backend exists — same "don't build shared abstraction until a second real example proves
+  it's shared" principle applied elsewhere in this codebase, e.g. 1.4.10/1.4.11).
+
+**Live verification (2026-08-16)**: ran end-to-end against the real local openEMS install with a
+reduced/fast config (`numfreq=101` — the smallest value that evenly decimates to the golden
+reference's own training grid). Result: `report.json` (42.7 KB) is the *only* per-sample output
+file — `manifest.json` no longer exists anywhere. Its `metrics` key carries exactly
+`port_numbers`/`s3p_path`/`s_parameters_convention`/`training_frequency_hz`/`training_vector`, with
+`training_vector` length **1818** and `training_frequency_hz` length **101** — matching the golden
+reference's own numbers exactly — and no `s_parameters`/`frequency_hz` (the full matrix stays out).
 
 ## CLI: `passivelab simulate` (sub-phase 1.4.9)
 

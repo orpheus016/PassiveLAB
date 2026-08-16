@@ -44,8 +44,8 @@ def test_openems_backend_runs_the_reference_sweep_on_a_known_tcoil(tmp_path):
     assert s3p_path.exists()
     assert s3p_path.read_text(encoding="utf-8").startswith("#")  # Touchstone header
 
-    manifest_path = pathlib.Path(result.raw["sim_dir"]) / "manifest.json"
-    assert manifest_path.exists()
+    report_path = pathlib.Path(result.raw["sim_dir"]) / "report.json"
+    assert report_path.exists()  # 1.4.4: renamed from manifest.json -- the only per-sample output file
 
     # 1.4.3: every port excitation's real openEMS console output is captured to a log file (not
     # silently dropped -- see plugin.py's _redirect_to_log), and num_cpus actually reaches the
@@ -58,3 +58,11 @@ def test_openems_backend_runs_the_reference_sweep_on_a_known_tcoil(tmp_path):
         assert log_text.strip()  # non-empty: silence was the bug being fixed
         assert f"{config.num_cpus} thread" in log_text
         assert pathlib.Path(log_paths["stats"]).exists()  # dump_statistics=True by default
+
+    # 1.4.4: S-parameters are post-processed to Metrics automatically; a lightweight summary rides
+    # into report.json (full raw matrix deliberately excluded -- see metrics_summary_for_report).
+    metrics = result.raw["metrics"]
+    assert len(metrics["training_vector"]) == 101 * 3 * 3 * 2  # golden-reference 1818-dim vector
+    assert metrics["port_numbers"] == [pd["portnumber"] for pd in result.raw["ports"]]
+    report_size = report_path.stat().st_size
+    assert report_size < 200_000  # sanity bound -- nowhere near what a full-matrix embed would cost
