@@ -37,6 +37,8 @@ def test_openems_backend_runs_the_reference_sweep_on_a_known_tcoil(tmp_path):
     assert result.backend == "openems"
     assert result.raw["success"] is True
     assert len(result.raw["ports"]) == 3  # this baseline spec is known to exercise the tap
+    assert result.raw["port_convention"]["de_embedding"] == "none applied"  # 1.4.2
+    assert result.raw["port_convention"]["port_z0"] == 50.0
 
     s3p_path = pathlib.Path(result.raw["s3p_path"])
     assert s3p_path.exists()
