@@ -92,5 +92,5 @@ convention explicit, and is not what 1.4.2 asked for.
 - `characterization/openems/ports.py` — `PortDef`, `_PORT_METAL_CONVENTION`,
   `derive_port_definitions()`.
 - `docs/OPENEMS_BACKEND.md`'s "Port re-embedding" section.
-- Board task **1.4.5** (notebook S-parameter equivalence check) — cites this document so "same
+- Board task **1.4.8** (notebook S-parameter equivalence check) — cites this document so "same
   S-parameters as the notebook" is a claim about a stated reference plane, not an assumption.
