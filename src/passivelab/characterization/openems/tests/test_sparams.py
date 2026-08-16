@@ -13,6 +13,7 @@ from passivelab.characterization.openems.sparams import (
     decimate_to_training_grid,
     flatten_training_vector,
     metrics_summary_for_report,
+    metrics_to_full_json,
     sparams_to_metrics,
 )
 from passivelab.characterization.openems.vendor.modules import util_utilities
@@ -111,3 +112,16 @@ def test_metrics_summary_for_report_is_json_serializable_and_excludes_the_full_m
     assert "frequency_hz" not in summary
     assert summary["port_numbers"] == [1, 2, 3]
     assert len(summary["training_vector"]) == 1818
+
+
+def test_metrics_to_full_json_is_json_serializable_and_keeps_the_full_matrix(tmp_path):
+    path, f, smatrix = _write_synthetic_s3p(tmp_path)
+    metrics = sparams_to_metrics(path, _PORT_DEFS)
+
+    full = metrics_to_full_json(metrics)
+    json.loads(json.dumps(full))  # must not raise -- complex arrays are split real/imag
+
+    assert len(full["frequency_hz"]) == len(f)
+    s_real = np.asarray(full["s_parameters"]["real"])
+    s_imag = np.asarray(full["s_parameters"]["imag"])
+    np.testing.assert_allclose(s_real + 1j * s_imag, metrics.values["s_parameters"])
