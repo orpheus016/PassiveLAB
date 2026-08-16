@@ -63,6 +63,12 @@ and copied verbatim from the golden reference** — generalizing a port/referenc
 convention across passive types is board task **1.4.2**'s scope, not this one (matches 1.4.1's own
 validation bar: "a known T-coil geometry").
 
+**Reference plane / de-embedding (1.4.2, see `docs/PORT_CONVENTION.md`).** The reference plane is
+the port box itself (`PORT_LENGTH` = 4 microns from the via), and no feedline/pad de-embedding is
+applied — the vendored solver has no calibration/subtraction step. `PortDef` carries this as data
+(`reference_plane_offset`, `de_embedded`), and `SimulationResult.raw["port_convention"]` stamps a
+top-level summary on every run so a dataset row is self-describing.
+
 ## Vendored PDK modules
 
 `vendor/modules/{util_stackup_reader,util_gds_reader,util_utilities,util_simulation_setup,

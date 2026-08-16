@@ -194,4 +194,13 @@ class OpenEMSBackend:
             "s3p_path": str(s3p_path),
             "ports": [pd._asdict() for pd in port_defs],
             "gds_path": str(gds_path),
+            # 1.4.2: the convention every port_defs entry above already encodes
+            # (reference_plane_offset/de_embedded/port_z0), surfaced as one top-level summary so a
+            # reader of a dataset row doesn't have to infer it by cross-checking every port entry.
+            # See docs/PORT_CONVENTION.md.
+            "port_convention": {
+                "reference_plane": "port box (lumped-port location; CalcPort's uf_ref/uf_inc reference)",
+                "de_embedding": "none applied",
+                "port_z0": port_defs[0].port_z0,
+            },
         }

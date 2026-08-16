@@ -16,6 +16,7 @@ import pytest
 
 import passivelab.geometry.tcoil  # self-registers "tcoil"
 from passivelab.characterization.openems.ports import (
+    PORT_LENGTH,
     PORT_START,
     derive_port_definitions,
     merge_layout_for_solver,
@@ -88,6 +89,10 @@ def test_derive_port_definitions_finds_all_three_ports_when_tap_is_exercised():
     assert [pd.source_layernum for pd in port_defs] == [PORT_START + 1, PORT_START + 2, PORT_START + 3]
     assert all(pd.port_z0 == 50.0 for pd in port_defs)
     assert all(pd.direction == "z" for pd in port_defs)
+    # 1.4.2: reference-plane/de-embedding convention is explicit data on every port, not just
+    # implicit in the generator's geometry.
+    assert all(pd.reference_plane_offset == PORT_LENGTH for pd in port_defs)
+    assert all(pd.de_embedded is False for pd in port_defs)
 
 
 def test_derive_port_definitions_renumbers_contiguously_when_tap_is_absent():
@@ -106,6 +111,8 @@ def test_derive_port_definitions_renumbers_contiguously_when_tap_is_absent():
     # wrong port or index out of range for whatever's numbered 3.
     assert [pd.portnumber for pd in port_defs] == [1, 2]
     assert [pd.source_layernum for pd in port_defs] == [PORT_START + 1, PORT_START + 3]
+    assert all(pd.reference_plane_offset == PORT_LENGTH for pd in port_defs)
+    assert all(pd.de_embedded is False for pd in port_defs)
 
 
 def test_derive_port_definitions_empty_ports_cell_returns_empty_list():
