@@ -94,3 +94,25 @@ pytest benchmark/geometry/tcoil/test_sweep.py -v -s
 which writes `benchmark/geometry/tcoil/sweep_out/report.json` instead.
 `src/passivelab/geometry/tcoil/rules.py`'s docstring records what that sweep found about where
 this repo's current parameter rules and the notebook's own usage disagree.
+
+## Simulating (characterizing) a layout
+
+```bash
+passivelab simulate examples/tcoil.spec.json examples/openems.config.json --out-dir out
+```
+
+Same "state it declaratively" shape as `generate`/`sweep`, one layer up: `spec.json` describes the
+device, `openems.config.json` (or any other registered solver's own config — the `"solver"` field
+picks the backend, the command itself never hardcodes one) describes the solver run. Generates the
+`Layout`, runs it through the named `SimulationBackend`, and writes `<out-dir>/simulate/
+<passive_type>/<solver>/report.json` pointing at the backend's own per-sample `manifest.json`/
+`.s3p` (see `docs/OPENEMS_BACKEND.md`'s output-folder design) — the report doesn't duplicate that
+data, just links to it.
+
+Needs the solver's own extra installed to actually run (e.g. `pip install -e ".[sim]"` for
+openems, plus a real openEMS/CSXCAD install — see `characterization/openems/vendor/NOTICE`);
+without it, `simulate` fails with a clear `error: ...` naming the missing extra, the same as
+`generate --no-png`'s matplotlib check.
+
+Single `spec.json` only for now — a `sweep-spec.json` (many samples through the same solver run)
+is a documented future enhancement, not built here (board task 1.4.9).
