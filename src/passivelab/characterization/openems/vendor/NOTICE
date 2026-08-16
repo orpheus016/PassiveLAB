@@ -24,3 +24,15 @@ Local changes from upstream (PassiveLAB sub-phase 1.4.6):
   unchanged; `modules/util_meshlines.py` needed no changes (it only ever consumed those plain
   Python classes, never gdspy's API directly). See `docs/OPENEMS_BACKEND.md` for the full mapping
   and `characterization/openems/tests/test_gds_reader.py` for regression coverage.
+
+Local changes from upstream (PassiveLAB sub-phase 1.4.3):
+- modules/util_simulation_setup.py: `runSimulation()` gained optional `num_threads`, `verbose`,
+  `dump_statistics` parameters forwarded to `FDTD.Run(excitation_path, **run_kwargs)`. The upstream
+  inline comment above that call warns "DO NOT SPECIFY COMMAND LINE OPTIONS HERE! That will fail
+  for repeated runs with multiple excitations." -- read as guarding against arbitrary/ad-hoc CLI
+  flags, not the narrow, openEMS-documented `numThreads`/`verbose`/`dump_statistics` kwargs added
+  here; this backend's caller (`plugin.py`'s per-port loop) already builds a brand-new `FDTD`
+  instance per excitation via `setupSimulation()`, so there is no cross-call state for these
+  options to corrupt. Confirmed safe by a live multi-port run (see `docs/OPENEMS_BACKEND.md`'s
+  "Live validation" section). All three parameters default to `None`/`False`, reproducing the exact
+  prior zero-kwarg `FDTD.Run(excitation_path)` call for any other caller.

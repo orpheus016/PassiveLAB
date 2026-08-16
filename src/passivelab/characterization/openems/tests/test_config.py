@@ -26,6 +26,10 @@ def test_defaults_match_the_golden_reference_hardcoded_constants():
     assert config.energy_limit_db == -50
     assert config.merge_polygon_size == 1.5
     assert config.preprocess_gds is True
+    # 1.4.3: silence was the bug this sub-phase fixes -- non-silent is the default, not opt-in.
+    assert config.install_path is None
+    assert config.verbose == 3
+    assert config.dump_statistics is True
 
 
 def test_no_gpu_field():
@@ -42,6 +46,9 @@ def test_load_openems_config_overrides_defaults(tmp_path):
         "xml_path": "custom_stackup.xml",
         "num_cpus": 32,
         "boundary_conditions": ["MUR", "MUR", "PEC", "PEC", "PEC", "PEC"],
+        "install_path": "C:/opt/openEMS/openEMS",
+        "verbose": 1,
+        "dump_statistics": False,
     }), encoding="utf-8")
 
     config = load_openems_config(path)
@@ -49,6 +56,9 @@ def test_load_openems_config_overrides_defaults(tmp_path):
     assert config.xml_path == "custom_stackup.xml"
     assert config.num_cpus == 32
     assert config.boundary_conditions == ("MUR", "MUR", "PEC", "PEC", "PEC", "PEC")
+    assert config.install_path == "C:/opt/openEMS/openEMS"
+    assert config.verbose == 1
+    assert config.dump_statistics is False
     assert config.numfreq == 1001  # untouched fields keep their default
 
 

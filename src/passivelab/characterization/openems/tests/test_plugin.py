@@ -46,3 +46,15 @@ def test_openems_backend_runs_the_reference_sweep_on_a_known_tcoil(tmp_path):
 
     manifest_path = pathlib.Path(result.raw["sim_dir"]) / "manifest.json"
     assert manifest_path.exists()
+
+    # 1.4.3: every port excitation's real openEMS console output is captured to a log file (not
+    # silently dropped -- see plugin.py's _redirect_to_log), and num_cpus actually reaches the
+    # solver (checkable now that the log text is captured at all).
+    assert len(result.raw["logs"]) == len(result.raw["ports"])
+    for log_paths in result.raw["logs"].values():
+        log_path = pathlib.Path(log_paths["log"])
+        assert log_path.exists()
+        log_text = log_path.read_text(encoding="utf-8", errors="replace")
+        assert log_text.strip()  # non-empty: silence was the bug being fixed
+        assert f"{config.num_cpus} thread" in log_text
+        assert pathlib.Path(log_paths["stats"]).exists()  # dump_statistics=True by default
