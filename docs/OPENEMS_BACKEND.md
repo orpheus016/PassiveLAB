@@ -165,14 +165,14 @@ Three real gaps found, **not yet fixed here** — tracked as board tasks, not si
 
 - **No install-path handling** — `CSXCAD` fails with an opaque `DLL load failed` on Windows unless
   `os.add_dll_directory(<install dir>)` runs before the import; nothing in this package does that
-  today. → board task **1.4.7**.
+  today. → board task **1.4.3**.
 - **`num_cpus` still not wired** — confirmed via the real `openEMS.Run()` signature
   (`numThreads (int) -- default 0 --> max`) that it always defaults to "max," harmless solo but a
-  real oversubscription risk once 1.5.2's concurrent Ray workers each grab all cores. → **1.4.7**.
+  real oversubscription risk once 1.5.2's concurrent Ray workers each grab all cores. → **1.4.3**.
 - **Runs silently by default** — no `verbose`/`dump_statistics` passed to `Run()`; the ~72-minute
-  run above looked identical to a hang until a diagnostic script added them manually. → **1.4.7**.
+  run above looked identical to a hang until a diagnostic script added them manually. → **1.4.3**.
 - The femtosecond-timestep root cause itself (real geometry constraint vs. a mesh-config artifact)
-  is unexplored — → board task **1.4.8**.
+  is unexplored — → board task **1.4.7**.
 
 `write_snp()`'s 1-port code path (indexes `Smatrix[0, index]` for a `(1, numfreq)`-shaped input,
 never exercised since T-coil's PAD/CIR ports are unconditional — a minimum of 2 ports always)
@@ -198,7 +198,7 @@ built here.
   sub-phase removes rather than reproduces.
 - `characterization/openems/vendor/NOTICE` — vendoring provenance and local changes.
 - Board tasks **1.4.2** (port/reference-plane/de-embedding convention, generalized across passive
-  types), **1.4.3** (S-parameter post-processing to `Metrics`), **1.4.7** (install path/num_cpus/
-  non-silent execution fixes), **1.4.8** (femtosecond-timestep root cause), **1.4.10** (CLI/API
+  types), **1.4.4** (S-parameter post-processing to `Metrics`), **1.4.3** (install path/num_cpus/
+  non-silent execution fixes), **1.4.7** (femtosecond-timestep root cause), **1.4.10** (CLI/API
   parity survey across `generate`/`characterize`/`optimize`/`evaluate`), **1.5.2** (Ray-distributed
   dataset generation calling this backend).
