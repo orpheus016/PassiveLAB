@@ -15,3 +15,12 @@ Local changes from upstream (PassiveLAB sub-phase 1.4.1):
   `if 1 in excite_portnumbers:` condition. Upstream code (and the golden notebook it was copied
   from) relied on a one-line source edit to disable this for headless/batch runs; this vendored
   copy makes that an explicit, tested parameter instead. No other behavioral changes.
+
+Local changes from upstream (PassiveLAB sub-phase 1.4.6):
+- modules/util_gds_reader.py: ported from `gdspy` to `gdstk` (the platform's own chosen GDSII
+  library, see `DEC-adopt-gdstk-as-the-l3-generator-backend-0002`) -- upstream's use of `gdspy`
+  reintroduced exactly the install friction (no Windows wheel, unmaintained upstream) that ADR
+  already replaced it for elsewhere. Output contract (`gds_polygon`/`all_polygons_list`) is
+  unchanged; `modules/util_meshlines.py` needed no changes (it only ever consumed those plain
+  Python classes, never gdspy's API directly). See `docs/OPENEMS_BACKEND.md` for the full mapping
+  and `characterization/openems/tests/test_gds_reader.py` for regression coverage.

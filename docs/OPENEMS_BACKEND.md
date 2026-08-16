@@ -68,7 +68,7 @@ validation bar: "a known T-coil geometry").
 `vendor/modules/{util_stackup_reader,util_gds_reader,util_utilities,util_simulation_setup,
 util_meshlines}.py` + `SG13G2.xml`, copied from a local `IHP-Open-PDK` checkout
 (`ihp-sg13g2/libs.tech/openems/openems_ihp_sg13g2/workflow/`, Apache 2.0 — see `vendor/NOTICE`).
-Two changes from upstream:
+Changes from upstream (1.4.1):
 
 1. Intra-package `import util_x` statements converted to relative imports (`from . import util_x`)
    so they work as a proper package instead of relying on `sys.path` manipulation.
@@ -83,11 +83,18 @@ Two changes from upstream:
 written CSX XML vs. a `simulation_model.hash` left from a prior run) — kept, not bypassed, since it
 becomes real content-addressed caching given the output-folder design below.
 
-**Note on `gdspy`**: `util_gds_reader.py` (and, transitively, `util_meshlines.py`) hard-depends on
-`gdspy`, not `gdstk` — the platform's own gdstk-over-gdspy choice
-(`DEC-adopt-gdstk-as-the-l3-generator-backend-0002`) was about the L3 *generator* backend; this is
-vendored third-party PDK code the solver plugin depends on, confined entirely to the `sim` extra
-and never touching `core/` or the gdstk-based generator.
+**`util_gds_reader.py` ported from `gdspy` to `gdstk` (1.4.6).** Upstream hard-depended on
+`gdspy`, not `gdstk` — reintroducing exactly the install friction (no Windows wheel, unmaintained
+upstream) `DEC-adopt-gdstk-as-the-l3-generator-backend-0002` already replaced it for elsewhere,
+just confined to the `sim` extra instead of the whole package. Every gdspy call had a confirmed
+gdstk equivalent (verified by introspecting the installed `gdstk` package plus existing precedent
+already in this repo — `gdstk.read_gds()` in `scripts/sweep.py`, `gdstk.boolean()` in
+`geometry/tcoil/generator.py`); the `gds_polygon`/`all_polygons_list` output contract is unchanged,
+so `util_meshlines.py` (which only ever consumed those plain classes, never gdspy's API) needed no
+changes. `gdspy` is no longer a dependency anywhere in this repo. See
+`characterization/openems/tests/test_gds_reader.py` for regression coverage — including a direct
+area-conservation check on the T-coil ground plane's `fracture()` call, the one path most at risk
+of a subtle port bug (the preprocessing step that splits self-intersecting/hole-encoded polygons).
 
 ## Config
 
@@ -147,12 +154,14 @@ path is absolute), no mutable instance/live-solver state between `simulate()` ca
   numfreq)`. T-coil never produces a 1-port sample (PAD/CIR are unconditional; only the tap is
   optional, giving a minimum of 2 ports), so this path is never hit by anything 1.4.1 validates
   against — flagged for whoever adds a genuinely single-port passive behind this backend later.
-- **`test_plugin.py` is unexercised in this environment.** `openEMS`/`CSXCAD`/`gdspy` aren't
-  installed here (compiled packages, not part of `.[dev]`) — the integration test is written and
+- **`test_plugin.py` is unexercised in this environment.** `openEMS`/`CSXCAD` aren't installed here
+  (compiled packages, not part of `.[dev]`) — the integration test is written and
   `pytest.importorskip`-guarded, but validating it against a real solver install and comparing
   against the golden notebook's own output for the same geometry (1.4.1's stated validation bar)
   is the next concrete step, ideally alongside first standing up the `sim` extra somewhere with
-  openEMS actually installed.
+  openEMS actually installed. (As of 1.4.6, `gdspy` is no longer one of the missing pieces — the
+  GDS-reading half of the pipeline is now exercised for real, by `test_gds_reader.py`, in this
+  environment.)
 
 ## See also
 

@@ -1,6 +1,11 @@
 # Extract objects on IHP layers in GDSII file
+#
+# PassiveLAB sub-phase 1.4.6: ported from gdspy to gdstk (see vendor/NOTICE). Behavior is
+# preserved -- same gds_polygon/all_polygons_list output contract -- only the GDS-reading
+# implementation changed, since gdstk's API differs from gdspy's (flat Polygon objects instead of
+# list-wrapped PolygonSets, no cell.get_layers()/get_polygons(by_spec=True)/remove_polygons()).
 
-import gdspy
+import gdstk
 import numpy as np
 import os
 from . import util_stackup_reader as stackup_reader
@@ -15,7 +20,7 @@ class gds_polygon:
   """
     gds polygon object
   """
-  
+
   def __init__ (self, layernum):
     self.pts_x = np.array([])
     self.pts_y = np.array([])
@@ -24,7 +29,7 @@ class gds_polygon:
     self.is_port = False
     self.is_via = False
     self.CSXpoly = None
-    
+
   def add_vertex (self, x,y):
     self.pts_x = np.append(self.pts_x, x)
     self.pts_y = np.append(self.pts_y, y)
@@ -37,7 +42,7 @@ class gds_polygon:
     self.ymax = np.max(self.pts_y)
 
   def __str__ (self):
-    # string representation 
+    # string representation
     mystr = 'Layer = ' + str(self.layernum) + ', Polygon = ' + str(self.pts) + ', Via = ' + str(self.is_via)
     return mystr
 
@@ -90,10 +95,10 @@ class all_polygons_list:
       self.xmin = min(self.xmin, x)
       self.xmax = max(self.xmax, x)
       self.ymin = min(self.ymin, y)
-      self.ymax = max(self.ymax, y)      
-    self.append(poly)        
+      self.ymax = max(self.ymax, y)
+    self.append(poly)
 
-    
+
 
 
   def set_bounding_box (self, xmin,xmax,ymin,ymax):
@@ -103,7 +108,7 @@ class all_polygons_list:
     self.ymax = ymax
 
   def get_bounding_box (self):
-    return self.xmin, self.xmax, self.ymin, self.ymax 
+    return self.xmin, self.xmax, self.ymin, self.ymax
 
 
 # ---------------------- via merging option --------------------
@@ -114,15 +119,16 @@ def merge_via_array (polygons, maxspacing):
   # Via array merging consists of 3 steps: oversize, merge, undersize
   # Value for oversize depends on via layer
   # Oversized vias touch if each via is oversized by half spacing
-  
+
   offset = maxspacing/2 + 0.01
-  
-  offsetpolygonset=gdspy.offset(polygons, offset, join='miter', tolerance=2, precision=0.001, join_first=False, max_points=199)
-  mergedpolygonset=gdspy.boolean(offsetpolygonset, None,"or", max_points=199)
-  mergedpolygonset=gdspy.offset(mergedpolygonset, -offset, join='miter', tolerance=2, precision=0.001, join_first=False, max_points=199)
-  
-  # offset and boolean return PolygonSet, we only need the list of polygons from that
-  return mergedpolygonset.polygons 
+
+  offsetpolygonset = gdstk.offset(polygons, offset, join='miter', tolerance=2, precision=0.001, use_union=False)
+  mergedpolygonset = gdstk.boolean(offsetpolygonset, [], "or")
+  mergedpolygonset = gdstk.offset(mergedpolygonset, -offset, join='miter', tolerance=2, precision=0.001, use_union=False)
+
+  # gdstk.offset()/boolean() already return a plain list[gdstk.Polygon] -- unlike gdspy's
+  # PolygonSet, there's no `.polygons` wrapper left to unwrap here.
+  return mergedpolygonset
 
 
 # ----------- read GDSII file, return openEMS polygon list object -----------
@@ -135,69 +141,59 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
   """
   if os.path.isfile(filename):
     print('Reading GDSII input file:', filename)
-  
-    input_library = gdspy.GdsLibrary(infile=filename)
 
-    if preprocess: 
+    input_library = gdstk.read_gds(filename)
+
+    if preprocess:
       print('Pre-processing GDSII to handle cutouts and self-intersecting polygons')
       # iterate over cells
-      for cell in input_library:
-        
-        # iterate over polygons
-        for poly in cell.polygons:
-          
-          # points of this polygon
-          polypoints = poly.polygons[0]
+      for cell in input_library.cells:
 
-          poly_layer = poly.layers[0]
-          poly_purpose = poly.datatypes[0]
+        # iterate over polygons -- snapshot the list: the loop below calls cell.remove()/
+        # cell.add() on cell.polygons, and mutating a list while iterating a live reference to
+        # it would skip or duplicate entries.
+        for poly in list(cell.polygons):
+
+          # points of this polygon
+          polypoints = poly.points
+
+          poly_layer = poly.layer
+          poly_purpose = poly.datatype
 
           if ((poly_layer in layerlist) and (poly_purpose in purposelist)):
-          
+
             # get number of vertices
-            numvertices = len(polypoints) 
-            
+            numvertices = len(polypoints)
+
             seen   = set()    # already seen vertex values
             dupefound = False
 
             # iterate over vertices to find duplicates
             for i_vertex in range(numvertices):
-              
+
               # print('polypoints  = ' + str(polypoints))
               x = polypoints[i_vertex][0]
               y = polypoints[i_vertex][1]
-              
+
               # create string representation so that we can check for duplicates
               vertex_string = str(x)+','+str(y)
               if vertex_string in seen:
                 dupefound = True
                 # print('      found duplicate at vertex ' + str(i_vertex) + ': ' + vertex_string)
               else:
-                seen.add(vertex_string)  
+                seen.add(vertex_string)
 
             if dupefound:
-                          
-              # do the slicing
-              
-              # convert polygon to format required for slicing
-              basepoly_points = []
 
-              for i_vertex in range(numvertices):
-                basepoly_points.append((polypoints[i_vertex,0], polypoints[i_vertex,1]))
+              # do the slicing -- fracture the real polygon directly (it already carries the
+              # right layer/datatype, unlike gdspy where a throwaway polygon had to be rebuilt
+              # from raw points first just to call fracture() on it)
+              fractured = poly.fracture(max_points=6)
 
-              # create new polygon
-              basepoly = gdspy.Polygon(basepoly_points, layer=poly_layer, datatype=poly_purpose)  
-              fractured = basepoly.fracture(max_points=6)
+              # remove original polygon, add the fractured replacement pieces
+              cell.remove(poly)
+              cell.add(*fractured)
 
-              # add fractured polygon to cell
-              cell.add(fractured)
-
-              # invalidate original polygon
-              poly.layers=[0]
-              # remove original polygon
-              cell.remove_polygons(lambda pts, layer, datatype:
-                layer == 0)
-    
     # end preprocessing
 
 
@@ -212,72 +208,74 @@ def read_gds(filename, layerlist, purposelist, metals_list, preprocess=False, me
     ymin=float('inf')
     xmax=float('-inf')
     ymax=float('-inf')
-      
+
     # iterate over IHP technology layers
     for layer_to_extract in layerlist:
-      
+
       # print ("Evaluating layer ", str(layer_to_extract))
-      # flatten hierarchy below this cell
-      cell.flatten(single_layer=None, single_datatype=None, single_texttype=None)
-      
-      # get layers used in cell
-      used_layers = cell.get_layers()
-      
-      # check if layer-to-extract is used in cell 
+      # flatten hierarchy below this cell (gdstk.Cell.flatten() has no layer/datatype/texttype
+      # remap params -- the original call always passed None for all three anyway)
+      cell.flatten()
+
+      # get layers used in cell -- gdstk.Cell has no get_layers(); build the set directly
+      used_layers = {p.layer for p in cell.polygons} | {l for p in cell.paths for l in p.layers}
+
+      # check if layer-to-extract is used in cell
       if (layer_to_extract in used_layers):
-              
-        # iterate over layer-purpose pairs (by_spec=true)
-        # do not descend into cell references (depth=0)
-        LPPpolylist = cell.get_polygons(by_spec=True, depth=0)
-        for LPP in LPPpolylist:
-          layer = LPP[0]
-          purpose = LPP[1]
-          
-          # now get polygons for this one layer-purpose-pair
-          if (layer==layer_to_extract) and (purpose in purposelist):
-            layerpolygons = LPPpolylist[(layer, purpose)]
 
-            # optional via array merging, only for via layers
-            metal = metals_list.getbylayernumber(layer_to_extract)
-            if metal != None:
-              if (merge_polygon_size>0) and metal.is_via:
-                layerpolygons = merge_via_array (layerpolygons, merge_polygon_size)
-            
-            # iterate over layer polygons
-            for polypoints in layerpolygons:
+        # gdstk.Cell.get_polygons() filters directly by layer=/datatype= (both required
+        # together) instead of returning a by-(layer,purpose) dict the way gdspy's
+        # get_polygons(by_spec=True) did -- loop purposelist explicitly instead of scanning a
+        # dict's keys for a match. depth=0 keeps the same "don't descend into references" scope
+        # as the original.
+        for purpose in purposelist:
+          layerpolygons = cell.get_polygons(depth=0, layer=layer_to_extract, datatype=purpose)
+          if not layerpolygons:
+            continue
 
-              numvertices = int(polypoints.size/polypoints.ndim)
+          # optional via array merging, only for via layers
+          metal = metals_list.getbylayernumber(layer_to_extract)
+          if metal != None:
+            if (merge_polygon_size>0) and metal.is_via:
+              layerpolygons = merge_via_array (layerpolygons, merge_polygon_size)
 
-              # new polygon, store layer number information
-              new_poly = gds_polygon(layer)
+          # iterate over layer polygons -- these are gdstk.Polygon objects (both from
+          # get_polygons() and from merge_via_array() above), not raw point arrays; use
+          # .points to get the same Nx2 array gdspy's raw elements gave directly.
+          for poly in layerpolygons:
+            polypoints = poly.points
+            numvertices = len(polypoints)
 
-              # get vertices
-              for vertex in range(numvertices):
-                x = polypoints[vertex,0]
-                y = polypoints[vertex,1]
+            # new polygon, store layer number information
+            new_poly = gds_polygon(layer_to_extract)
 
-                new_poly.add_vertex(x,y)
-                
-                # update bounding box information
-                if x<xmin: xmin=x
-                if x>xmax: xmax=x
-                if y<ymin: ymin=y
-                if y>ymax: ymax=y
-              
-              # polygon is complete, process and add to list
-              all_polygons.append(new_poly)
+            # get vertices
+            for vertex in range(numvertices):
+              x = polypoints[vertex,0]
+              y = polypoints[vertex,1]
+
+              new_poly.add_vertex(x,y)
+
+              # update bounding box information
+              if x<xmin: xmin=x
+              if x>xmax: xmax=x
+              if y<ymin: ymin=y
+              if y>ymax: ymax=y
+
+            # polygon is complete, process and add to list
+            all_polygons.append(new_poly)
 
     all_polygons.set_bounding_box (xmin,xmax,ymin,ymax)
-    
-          
-      
+
+
+
     # done!
     return all_polygons
-  
+
   else:
     print('GDSII input file not found: ', filename)
     exit()
- 
+
 
 
 # =======================================================================================
@@ -292,4 +290,4 @@ if __name__ == "__main__":
     print(poly)
 
   print("Bounding box: " + str(allpolygons.xmin) + " " + str(allpolygons.xmax) + " " + str(allpolygons.ymin) + " " + str(allpolygons.ymax))
-  
+
