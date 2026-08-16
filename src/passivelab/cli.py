@@ -40,13 +40,13 @@ from passivelab.scripts.sweep import sweep_command
 def generate_command(spec_path: str | pathlib.Path, out_dir: str | pathlib.Path, *,
                       png: bool = True) -> pathlib.Path:
     """Load `spec_path`, validate, generate, write the GDS (and PNG unless `png=False`) under
-    `out_dir/single/<passive_type>/`, named after the generated cell. Returns the written GDS
-    path."""
+    `out_dir/generate/single/<passive_type>/`, named after the generated cell. Returns the written
+    GDS path."""
     spec = load_spec(spec_path)
     spec.validate()
     layout = generate(spec)
 
-    cell_dir = pathlib.Path(out_dir) / "single" / spec.passive_type
+    cell_dir = pathlib.Path(out_dir) / "generate" / "single" / spec.passive_type
     cell_dir.mkdir(parents=True, exist_ok=True)
     gds_path = cell_dir / f"{layout.cell.name}.gds"
     lib = gdstk.Library()

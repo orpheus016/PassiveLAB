@@ -24,8 +24,8 @@ from passivelab.scripts.simulate import simulate_command
 EXAMPLE_SPEC = "examples/tcoil.spec.json"
 
 # Real PortDef shapes matching what characterization/openems/ports.py's PortDef._asdict()
-# produces -- --plot's _write_characterize_output() reconstructs PortDef(**p) from exactly this
-# shape. 3 ports to match the ".s3p" filename below (skrf infers port count from the extension).
+# produces -- --plot's _write_plot_output() reconstructs PortDef(**p) from exactly this shape.
+# 3 ports to match the ".s3p" filename below (skrf infers port count from the extension).
 _STUB_PORTS = [
     {"portnumber": 1, "source_layernum": 201, "from_layername": "Metal4", "to_layername": "TopMetal2",
      "port_z0": 50.0, "voltage": 1.0, "direction": "z", "reference_plane_offset": 4.0, "de_embedded": False},
@@ -97,9 +97,10 @@ def test_simulate_command_writes_a_report_pointing_at_the_backend_result(tmp_pat
     assert report["s3p_path"].endswith("result.s3p")
 
 
-def test_simulate_command_report_path_is_under_simulate_passive_type_solver(tmp_path, stub_solver_config):
+def test_simulate_command_report_path_is_under_simulate_single_passive_type_solver(tmp_path, stub_solver_config):
     report_path = simulate_command(EXAMPLE_SPEC, stub_solver_config, tmp_path)
-    assert report_path == tmp_path / "simulate" / "tcoil" / "stub-solver-test" / "report.json"
+    assert report_path == (tmp_path / "simulate" / "single" / "tcoil"
+                            / "stub-solver-test" / "report.json")
 
 
 def test_simulate_command_writes_a_failure_report_and_reraises(tmp_path, stub_solver_config):
@@ -109,7 +110,7 @@ def test_simulate_command_writes_a_failure_report_and_reraises(tmp_path, stub_so
     with pytest.raises(RuntimeError, match="stub solver failure"):
         simulate_command(EXAMPLE_SPEC, stub_solver_config, tmp_path)
 
-    report_path = tmp_path / "simulate" / "tcoil" / "stub-solver-test" / "report.json"
+    report_path = tmp_path / "simulate" / "single" / "tcoil" / "stub-solver-test" / "report.json"
     assert report_path.exists()  # written even on failure, per finally-block design
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["success"] is False
@@ -149,7 +150,7 @@ def test_out_dir_is_resolved_to_absolute_before_the_solve(tmp_path, stub_solver_
     relative_out = "out_rel"
     report_path = simulate_command(spec_path, stub_solver_config, relative_out)
     assert report_path.is_absolute()
-    assert report_path == (tmp_path / relative_out / "simulate" / "tcoil"
+    assert report_path == (tmp_path / relative_out / "simulate" / "single" / "tcoil"
                             / "stub-solver-test" / "report.json")
 
 
@@ -165,7 +166,7 @@ def stub_solver_config_with_real_s3p(tmp_path):
     return path
 
 
-def test_plot_writes_characterize_output_alongside_the_simulate_report(
+def test_plot_writes_metrics_and_a_plot_into_the_sample_dir(
         tmp_path, stub_solver_config_with_real_s3p):
     pytest.importorskip("plotly")
 
@@ -173,19 +174,25 @@ def test_plot_writes_characterize_output_alongside_the_simulate_report(
                                     plot=True)
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    char_report_path = tmp_path / "characterize" / "tcoil" / "stub-solver-test" / "stubsample" / "report.json"
-    assert report["characterize_report_path"] == str(char_report_path)
-    assert char_report_path.exists()
+    # nested in the backend's own per-sample dir (one level below the CLI-level report.json's
+    # own directory), not a separate tree
+    sample_dir = pathlib.Path(report["sim_dir"])
+    metrics_path = sample_dir / "metrics.json"
+    assert report["metrics_path"] == str(metrics_path)
+    assert metrics_path.exists()
 
-    char_report = json.loads(char_report_path.read_text(encoding="utf-8"))
-    assert char_report["port_numbers"] == [1, 2, 3]
-    assert "s_parameters" in char_report  # full matrix, unlike simulate's own lightweight summary
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    assert metrics["port_numbers"] == [1, 2, 3]
+    assert "s_parameters" in metrics  # full matrix, unlike simulate's own lightweight summary
 
-    plot_path = char_report_path.parent / "sparams.html"
+    plot_path = sample_dir / "sparams.html"
     assert plot_path.exists()
     assert "plotly" in plot_path.read_text(encoding="utf-8").lower()
 
 
-def test_plot_false_by_default_writes_no_characterize_output(tmp_path, stub_solver_config_with_real_s3p):
-    simulate_command(EXAMPLE_SPEC, stub_solver_config_with_real_s3p, tmp_path)
-    assert not (tmp_path / "characterize").exists()
+def test_plot_false_by_default_writes_no_metrics_or_plot(tmp_path, stub_solver_config_with_real_s3p):
+    report_path = simulate_command(EXAMPLE_SPEC, stub_solver_config_with_real_s3p, tmp_path)
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    sample_dir = pathlib.Path(report["sim_dir"])
+    assert not (sample_dir / "metrics.json").exists()
+    assert not (sample_dir / "sparams.html").exists()
