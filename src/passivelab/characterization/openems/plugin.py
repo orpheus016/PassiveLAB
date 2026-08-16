@@ -28,7 +28,7 @@ from importlib import metadata as importlib_metadata
 
 import gdstk
 
-from passivelab.characterization.openems.config import OpenEMSConfig
+from passivelab.characterization.openems.config import OpenEMSConfig, load_openems_config
 from passivelab.characterization.openems.ports import (
     derive_port_definitions,
     merge_layout_for_solver,
@@ -77,6 +77,12 @@ class OpenEMSBackend:
     openEMS/CSXCAD object between ``simulate()`` calls -- every FDTD object is constructed and torn
     down entirely inside one call, so an instance is safe to reuse across many samples (from a
     single caller today; from many concurrent Ray workers once 1.5.2 lands)."""
+
+    #: Lets solver-agnostic callers (e.g. ``scripts/simulate.py``) resolve the right config
+    #: loader for whatever solver a registry lookup returned, without importing this module's
+    #: config class directly -- mirrors how ``config.solver``/``registry.get()`` already keep the
+    #: CLI from hardcoding "openems" anywhere but the JSON file itself.
+    load_config = staticmethod(load_openems_config)
 
     def __init__(self, config: OpenEMSConfig, out_dir: str | pathlib.Path):
         self.config = config

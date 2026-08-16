@@ -142,26 +142,47 @@ re-reading the `.s3p` file.
 Other scalability constraints upheld (see `plugin.py`'s module docstring): no `os.chdir()` (every
 path is absolute), no mutable instance/live-solver state between `simulate()` calls.
 
-## Known limitations / open items
+## Live validation (2026-08-15/16)
 
-- **`num_cpus` mechanism unconfirmed.** Neither vendored file sets an explicit thread count;
-  openEMS's `FDTD.Run()` likely respects `OMP_NUM_THREADS` implicitly (standard for OpenMP-based
-  solvers), but this isn't verified against the installed `openEMS` package's actual API (not
-  exercised in this environment — the `sim` extra isn't installed here). `OpenEMSConfig.num_cpus`
-  is captured but not yet wired to anything; resolve when first run against a real installation.
-- **Vendored `write_snp()`'s 1-port code path is untested by this sub-phase.** It indexes
-  `Smatrix[0, index]` for a `(1, numfreq)`-shaped input, but this backend always builds `(n, n,
-  numfreq)`. T-coil never produces a 1-port sample (PAD/CIR are unconditional; only the tap is
-  optional, giving a minimum of 2 ports), so this path is never hit by anything 1.4.1 validates
-  against — flagged for whoever adds a genuinely single-port passive behind this backend later.
-- **`test_plugin.py` is unexercised in this environment.** `openEMS`/`CSXCAD` aren't installed here
-  (compiled packages, not part of `.[dev]`) — the integration test is written and
-  `pytest.importorskip`-guarded, but validating it against a real solver install and comparing
-  against the golden notebook's own output for the same geometry (1.4.1's stated validation bar)
-  is the next concrete step, ideally alongside first standing up the `sim` extra somewhere with
-  openEMS actually installed. (As of 1.4.6, `gdspy` is no longer one of the missing pieces — the
-  GDS-reading half of the pipeline is now exercised for real, by `test_gds_reader.py`, in this
-  environment.)
+First real end-to-end run against an actual openEMS/CSXCAD install (not `test_plugin.py` itself —
+a throwaway diagnostic script, since three gaps below made the committed path unusable as-is):
+baseline spec `examples/tcoil.spec.json`, full 3-port sweep. Result: a real, well-formed 3-port
+`.s3p`, checked against real physics rather than just "it didn't crash" — **reciprocity** (S_ij vs
+S_ji) within 0.013 max deviation (worst at 100 GHz, the top of the band, where FDTD discretization
+error is naturally largest), and **passivity** (max eigenvalue of SᴴS) clean across all 1001
+frequency points, max 0.998, zero violations. Total wall-clock ~72 minutes (port 1: 2063.5s, port
+2: 615.9s, port 3: 1662.8s) — openEMS itself flagged why: a femtosecond-scale CFL timestep forced
+by one small mesh cell (`Smallest timestep... found at position: 2:126;52;27`), not a threading
+problem (openEMS auto-benchmarked 1-4 threads and picked 3 as fastest on its own).
+
+Three real gaps found, **not yet fixed here** — tracked as board tasks, not silently left as prose:
+
+- **No install-path handling** — `CSXCAD` fails with an opaque `DLL load failed` on Windows unless
+  `os.add_dll_directory(<install dir>)` runs before the import; nothing in this package does that
+  today. → board task **1.4.7**.
+- **`num_cpus` still not wired** — confirmed via the real `openEMS.Run()` signature
+  (`numThreads (int) -- default 0 --> max`) that it always defaults to "max," harmless solo but a
+  real oversubscription risk once 1.5.2's concurrent Ray workers each grab all cores. → **1.4.7**.
+- **Runs silently by default** — no `verbose`/`dump_statistics` passed to `Run()`; the ~72-minute
+  run above looked identical to a hang until a diagnostic script added them manually. → **1.4.7**.
+- The femtosecond-timestep root cause itself (real geometry constraint vs. a mesh-config artifact)
+  is unexplored — → board task **1.4.8**.
+
+`write_snp()`'s 1-port code path (indexes `Smatrix[0, index]` for a `(1, numfreq)`-shaped input,
+never exercised since T-coil's PAD/CIR ports are unconditional — a minimum of 2 ports always)
+remains untested, flagged for whoever adds a genuinely single-port passive later.
+
+## CLI: `passivelab simulate` (sub-phase 1.4.9)
+
+`scripts/simulate.py`'s `simulate_command()` (+ `passivelab simulate spec.json solver-config.json
+--out-dir out`, see the README) runs the whole pipeline in one call — generate → merge → solve →
+report.json — the same "one command, one artifact" shape as `generate`/`sweep`, resolving the
+solver via `core/characterization/registry.py` from the config's own `"solver"` field rather than
+importing `OpenEMSBackend` directly, so a second solver plugin needs no CLI changes. `OpenEMSBackend
+.load_config` (a `staticmethod` pointing at `load_openems_config`) is what lets the CLI resolve the
+right config loader generically through the registry lookup. Single-spec only for v1; auto-detecting
+a sweep-spec from the input JSON's shape is a documented future enhancement (the task body), not
+built here.
 
 ## See also
 
@@ -171,5 +192,7 @@ path is absolute), no mutable instance/live-solver state between `simulate()` ca
   sub-phase removes rather than reproduces.
 - `characterization/openems/vendor/NOTICE` — vendoring provenance and local changes.
 - Board tasks **1.4.2** (port/reference-plane/de-embedding convention, generalized across passive
-  types), **1.4.3** (S-parameter post-processing to `Metrics`), **1.5.2** (Ray-distributed dataset
-  generation calling this backend).
+  types), **1.4.3** (S-parameter post-processing to `Metrics`), **1.4.7** (install path/num_cpus/
+  non-silent execution fixes), **1.4.8** (femtosecond-timestep root cause), **1.4.10** (CLI/API
+  parity survey across `generate`/`characterize`/`optimize`/`evaluate`), **1.5.2** (Ray-distributed
+  dataset generation calling this backend).
