@@ -15,6 +15,10 @@ does, with the notebook-specific hacks removed rather than reproduced:
   ``num_cpus``, ``verbose``, and ``dump_statistics`` are wired all the way through to
   ``os.add_dll_directory()`` and ``FDTD.Run()`` (1.4.3), and every port excitation's real openEMS
   console output is captured to ``<sim_dir>/sub-N/openems_run.log``.
+- No output left un-post-processed -- every run's S-parameters are reduced to a ``Metrics`` object
+  (via ``sparams.py``, same ``skrf`` mechanism the golden reference itself uses) and a lightweight
+  summary rides into ``<sim_dir>/report.json`` automatically (1.4.4), not just left as a `.s3p` a
+  caller has to remember to post-process separately.
 
 Ray/distributed fan-out (calling this backend from many concurrent workers) is sub-phase 1.5.2's
 scope, not built here -- this backend is designed to be safe under that usage (stateless instance,
@@ -40,6 +44,10 @@ from passivelab.characterization.openems.ports import (
     derive_port_definitions,
     merge_layout_for_solver,
 )
+from passivelab.characterization.openems.sparams import (
+    metrics_summary_for_report,
+    sparams_to_metrics,
+)
 from passivelab.core.types import Layout, SimulationResult
 
 _UNIT = 1e-6  # geometry is in microns, matching the golden reference and the tcoil generator
@@ -63,7 +71,7 @@ _UNIT = 1e-6  # geometry is in microns, matching the golden reference and the tc
 
 
 def _solver_versions() -> dict[str, str]:
-    """Best-effort package version lookup for the manifest -- never raises: the compiled
+    """Best-effort package version lookup for the report -- never raises: the compiled
     openEMS/CSXCAD packages don't guarantee a programmatic ``__version__``, so this falls back to
     "unknown" rather than failing a run over a diagnostics field."""
     versions = {}
@@ -133,7 +141,7 @@ class OpenEMSBackend:
         sample_id = _sample_id(layout)
         sim_dir = (self.out_dir / sample_id).resolve()
         sim_dir.mkdir(parents=True, exist_ok=True)
-        manifest = {
+        report = {
             "sample_id": sample_id,
             "solver": "openems",
             "config": dataclasses.asdict(self.config),
@@ -143,15 +151,18 @@ class OpenEMSBackend:
         start = time.monotonic()
         try:
             result = self._simulate(layout, sim_dir, sample_id)
-            manifest.update(result)
-            manifest["success"] = True
-            return SimulationResult(backend="openems", raw={**manifest, "sim_dir": str(sim_dir)})
+            report.update(result)
+            report["success"] = True
+            return SimulationResult(backend="openems", raw={**report, "sim_dir": str(sim_dir)})
         except Exception as e:
-            manifest["error"] = f"{type(e).__name__}: {e}"
+            report["error"] = f"{type(e).__name__}: {e}"
             raise
         finally:
-            manifest["wall_clock_seconds"] = time.monotonic() - start
-            (sim_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            report["wall_clock_seconds"] = time.monotonic() - start
+            # 1.4.4: report.json -- the only per-sample output file in sim_dir (previously
+            # manifest.json; renamed so every simulation output, including the post-processed
+            # Metrics summary added below, lives under one consistently-named artifact).
+            (sim_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     def _simulate(self, layout: Layout, sim_dir: pathlib.Path, sample_id: str) -> dict:
         config = self.config
@@ -254,10 +265,17 @@ class OpenEMSBackend:
         s3p_path = sim_dir / f"{sample_id}.s{n}p"
         utilities.write_snp(snm, f, str(s3p_path))
 
+        # 1.4.4: post-process the S-parameters this run just wrote into a Metrics object (via
+        # sparams.py, same skrf mechanism the golden reference itself uses) -- the lightweight
+        # summary rides into report.json below; the full Metrics (including the raw (n, n,
+        # numfreq) matrix) is available to any direct caller of this backend via sparams_to_metrics
+        # itself, without needing to re-read the .s3p file.
+        metrics = sparams_to_metrics(s3p_path, port_defs)
+
         # The Touchstone file is the canonical S-parameter artifact (matches how the golden
-        # reference's own dataset loader reads results back off disk) -- `raw`/the manifest point
+        # reference's own dataset loader reads results back off disk) -- `raw`/`report.json` point
         # to it rather than duplicating the full (n, n, numfreq) matrix as JSON, which would bloat
-        # every sample's manifest at 1.5.2's thousands-of-samples scale for no reader that isn't
+        # every sample's report at 1.5.2's thousands-of-samples scale for no reader that isn't
         # already better served by re-reading the .s3p file (e.g. via `skrf`).
         return {
             "s3p_path": str(s3p_path),
@@ -277,4 +295,7 @@ class OpenEMSBackend:
             # correctly" is answerable by reading a file, not by re-deriving the sub-N/ folder
             # convention or re-running with verbosity turned on after the fact.
             "logs": port_logs,
+            # 1.4.4: lightweight post-processed summary (decimated training-target vector +
+            # pointers) -- deliberately excludes the full raw matrix, see metrics_summary_for_report.
+            "metrics": metrics_summary_for_report(metrics),
         }

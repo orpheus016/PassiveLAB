@@ -12,7 +12,12 @@ license = { file = "LICENSE" }
 # gdstk lands here in sub-phase 1.1.2 (the L3 Generator backend, per the gdstk-vs-gdspy
 # matrix in docs/GENERATOR_COMPARISON_MATRIX.md). Further runtime deps (openEMS/torch/
 # optuna/ngspice bindings) are added per sub-phase, as the PRD's interfaces land.
-dependencies = ["gdstk>=0.9"]
+# scikit-rf (1.4.3.5): Touchstone S-parameter I/O, the same mechanism the golden reference itself
+# uses for every S3P read/write (load_sparameters()/GetPredictedNetwork(), and 1.7's ngspice
+# transcription). Pure Python + numpy, no compiled solver dependency unlike openEMS/CSXCAD -- lives
+# here (not the `sim` extra) so S-parameter post-processing is testable without a live solver
+# install, needed by 1.4.4's own tests and later by 1.4.8/1.5/1.7.
+dependencies = ["gdstk>=0.9", "scikit-rf>=1.0"]
 
 [project.optional-dependencies]
 # Keep `dev` minimal so CI stays fast.

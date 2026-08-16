@@ -105,9 +105,10 @@ Same "state it declaratively" shape as `generate`/`sweep`, one layer up: `spec.j
 device, `openems.config.json` (or any other registered solver's own config — the `"solver"` field
 picks the backend, the command itself never hardcodes one) describes the solver run. Generates the
 `Layout`, runs it through the named `SimulationBackend`, and writes `<out-dir>/simulate/
-<passive_type>/<solver>/report.json` pointing at the backend's own per-sample `manifest.json`/
-`.s3p` (see `docs/OPENEMS_BACKEND.md`'s output-folder design) — the report doesn't duplicate that
-data, just links to it.
+<passive_type>/<solver>/report.json` pointing at the backend's own per-sample `report.json`/
+`.s3p` (see `docs/OPENEMS_BACKEND.md`'s output-folder design) — the report doesn't duplicate the
+full S-parameter matrix, just links to it (a small post-processed summary does ride along — see
+`docs/OPENEMS_BACKEND.md`'s "S-parameter post-processing" section, 1.4.4).
 
 Needs the solver's own extra installed to actually run (e.g. `pip install -e ".[sim]"` for
 openems, plus a real openEMS/CSXCAD install — see `characterization/openems/vendor/NOTICE`);

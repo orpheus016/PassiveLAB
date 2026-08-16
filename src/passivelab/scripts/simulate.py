@@ -72,6 +72,7 @@ def simulate_command(spec_path: str | pathlib.Path, solver_config_path: str | pa
             "s3p_path": result.raw.get("s3p_path"),
             "ports": result.raw.get("ports"),
             "wall_clock_seconds": result.raw.get("wall_clock_seconds"),
+            "metrics": result.raw.get("metrics"),  # 1.4.4: post-processed S-parameter summary
         })
     except Exception as e:
         report.update({"success": False, "error": f"{type(e).__name__}: {e}"})
